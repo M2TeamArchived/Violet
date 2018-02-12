@@ -135,11 +135,15 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 {
 	HRESULT hr = S_OK;
 
-	AVPacket* avPacket = NULL;
+	AVPacket avPacket;
+	av_init_packet(&avPacket);
+	avPacket.data = NULL;
+	avPacket.size = 0;
+
 	LONGLONG pts = 0;
 	LONGLONG dur = 0;
 
-	hr = GetNextPacket(&avPacket, pts, dur);
+	hr = GetNextPacket(avPacket, pts, dur);
 	if (hr == S_FALSE)
 	{
 		// End of stream reached. Feed NULL packet to decoder to enter draining mode.
@@ -158,7 +162,7 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 	else if (SUCCEEDED(hr))
 	{
 		// Feed packet to decoder.
-		int sendPacketResult = avcodec_send_packet(m_pAvCodecCtx, avPacket);
+		int sendPacketResult = avcodec_send_packet(m_pAvCodecCtx, &avPacket);
 		if (sendPacketResult == AVERROR(EAGAIN))
 		{
 			// The decoder should have been drained and always ready to access input
@@ -173,10 +177,7 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 		}
 	}
 
-	if (avPacket)
-	{
-		av_packet_free(&avPacket);
-	}
+	av_packet_unref(&avPacket);
 
 	return hr;
 }

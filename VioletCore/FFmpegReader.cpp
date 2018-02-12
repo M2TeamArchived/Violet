@@ -37,32 +37,31 @@ FFmpegReader::~FFmpegReader()
 int FFmpegReader::ReadPacket()
 {
 	int ret;
-	AVPacket *avPacket = av_packet_alloc();
-	if (!avPacket)
-	{
-		return E_OUTOFMEMORY;
-	}
+	AVPacket avPacket;
+	av_init_packet(&avPacket);
+	avPacket.data = NULL;
+	avPacket.size = 0;
 
-	ret = av_read_frame(m_pAvFormatCtx, avPacket);
+	ret = av_read_frame(m_pAvFormatCtx, &avPacket);
 	if (ret < 0)
 	{
-		av_packet_free(&avPacket);
+		av_packet_unref(&avPacket);
 		return ret;
 	}
 
 	// Push the packet to the appropriate
-	if (avPacket->stream_index == m_audioStreamIndex && m_audioSampleProvider != nullptr)
+	if (avPacket.stream_index == m_audioStreamIndex && m_audioSampleProvider != nullptr)
 	{
 		m_audioSampleProvider->QueuePacket(avPacket);
 	}
-	else if (avPacket->stream_index == m_videoStreamIndex && m_videoSampleProvider != nullptr)
+	else if (avPacket.stream_index == m_videoStreamIndex && m_videoSampleProvider != nullptr)
 	{
 		m_videoSampleProvider->QueuePacket(avPacket);
 	}
 	else
 	{
 		DebugMessage(L"Ignoring unused stream\n");
-		av_packet_free(&avPacket);
+		av_packet_unref(&avPacket);
 	}
 
 	return ret;

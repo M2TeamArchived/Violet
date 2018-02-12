@@ -9,7 +9,7 @@ namespace FFmpegInterop
 	public:
 		FFmpegInteropConfig()
 		{
-			VideoOutputAllowIyuv = false;
+			VideoOutputAllowIyuv = true; // false;
 			VideoOutputAllowBgra8 = false;
 
 			SkipErrors = 50;

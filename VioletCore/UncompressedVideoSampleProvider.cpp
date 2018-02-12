@@ -98,6 +98,11 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 		m_bUseScaler = true;
 	}
 
+	if (!m_bUseScaler)
+	{
+
+	}
+
 	DecoderWidth = width;
 	DecoderHeight = height;
 }
@@ -207,35 +212,52 @@ HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 	return hr;
 }
 
+Guid g_MFMTVideoChromaSiting(MF_MT_VIDEO_CHROMA_SITING);
+
+IBox<uint32>^ g_MFVideoChromaSubsampling_MPEG2 = ref new Box<uint32>(MFVideoChromaSubsampling_MPEG2);
+IBox<uint32>^ g_MFVideoChromaSubsampling_MPEG1 = ref new Box<uint32>(MFVideoChromaSubsampling_MPEG1);
+IBox<uint32>^ g_MFVideoChromaSubsampling_DV_PAL = ref new Box<uint32>(MFVideoChromaSubsampling_DV_PAL);
+IBox<uint32>^ g_MFVideoChromaSubsampling_Cosited = ref new Box<uint32>(MFVideoChromaSubsampling_Cosited);
+
+IBox<int>^ g_TrueValue = ref new Box<int>(TRUE);
+IBox<int>^ g_FalseValue = ref new Box<int>(FALSE);
+
+Guid g_MFSampleExtension_Interlaced(MFSampleExtension_Interlaced);
+Guid g_MFSampleExtension_BottomFieldFirst(MFSampleExtension_BottomFieldFirst);
+Guid g_MFSampleExtension_RepeatFirstField(MFSampleExtension_RepeatFirstField);
+
 HRESULT UncompressedVideoSampleProvider::SetSampleProperties(MediaStreamSample^ sample)
 {
+	MediaStreamSamplePropertySet^ ExtendedProperties = sample->ExtendedProperties;
+	
+	
 	if (m_interlaced_frame)
 	{
-		sample->ExtendedProperties->Insert(MFSampleExtension_Interlaced, TRUE);
-		sample->ExtendedProperties->Insert(MFSampleExtension_BottomFieldFirst, m_top_field_first ? safe_cast<Platform::Object^>(FALSE) : TRUE);
-		sample->ExtendedProperties->Insert(MFSampleExtension_RepeatFirstField, safe_cast<Platform::Object^>(FALSE));
+		ExtendedProperties->Insert(g_MFSampleExtension_Interlaced, g_TrueValue);
+		ExtendedProperties->Insert(g_MFSampleExtension_BottomFieldFirst, m_top_field_first ? g_FalseValue : g_TrueValue);
+		ExtendedProperties->Insert(g_MFSampleExtension_RepeatFirstField, g_FalseValue);
 	}
 	else
 	{
-		sample->ExtendedProperties->Insert(MFSampleExtension_Interlaced, safe_cast<Platform::Object^>(FALSE));
+		ExtendedProperties->Insert(g_MFSampleExtension_Interlaced, g_FalseValue);
 	}
 
 	switch (m_chroma_location)
 	{
 	case AVCHROMA_LOC_LEFT:
-		sample->ExtendedProperties->Insert(MF_MT_VIDEO_CHROMA_SITING, (uint32)MFVideoChromaSubsampling_MPEG2);
+		ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_MPEG2);
 		break;
 	case AVCHROMA_LOC_CENTER:
-		sample->ExtendedProperties->Insert(MF_MT_VIDEO_CHROMA_SITING, (uint32)MFVideoChromaSubsampling_MPEG1);
+		ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_MPEG1);
 		break;
 	case AVCHROMA_LOC_TOPLEFT:
 		if (m_interlaced_frame)
 		{
-			sample->ExtendedProperties->Insert(MF_MT_VIDEO_CHROMA_SITING, (uint32)MFVideoChromaSubsampling_DV_PAL);
+			ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_DV_PAL);
 		}
 		else
 		{
-			sample->ExtendedProperties->Insert(MF_MT_VIDEO_CHROMA_SITING, (uint32)MFVideoChromaSubsampling_Cosited);
+			ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_Cosited);
 		}
 		break;
 	default:

@@ -41,9 +41,9 @@ namespace FFmpegInterop
 
 	internal:
 		virtual HRESULT AllocateResources();
-		void QueuePacket(AVPacket *packet);
-		AVPacket* PopPacket();
-		HRESULT GetNextPacket(AVPacket** avPacket, LONGLONG & packetPts, LONGLONG & packetDuration);
+		void QueuePacket(AVPacket& packet);
+		void PopPacket(AVPacket& packet);
+		HRESULT GetNextPacket(AVPacket& avPacket, LONGLONG & packetPts, LONGLONG & packetDuration);
 		virtual HRESULT CreateNextSampleBuffer(IBuffer^* pBuffer, int64_t& samplePts, int64_t& sampleDuration) { return E_FAIL; }; // must be overridden
 		virtual HRESULT SetSampleProperties(MediaStreamSample^ sample) { return S_OK; }; // can be overridded for setting extended properties
 		void DisableStream();
@@ -57,7 +57,7 @@ namespace FFmpegInterop
 			int streamIndex);
 
 	private:
-		std::queue<AVPacket*> m_packetQueue;
+		std::queue<AVPacket> m_packetQueue;
 		int64 m_nextPacketPts;
 
 	internal:
