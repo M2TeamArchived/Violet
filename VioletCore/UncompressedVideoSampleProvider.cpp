@@ -38,6 +38,12 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 	int streamIndex)
 	: UncompressedSampleProvider(reader, avFormatCtx, avCodecCtx, config, streamIndex)
 {
+	for (int i = 0; i < 4; i++)
+	{
+		this->m_VideoBufferLineSize[i] = 0;
+		this->m_VideoBufferData[i] = nullptr;
+	}
+	
 	if (config->VideoOutputAllowIyuv && (m_pAvCodecCtx->pix_fmt == AV_PIX_FMT_YUV420P || m_pAvCodecCtx->pix_fmt == AV_PIX_FMT_YUVJ420P)
 		&& m_pAvCodecCtx->codec->capabilities & AV_CODEC_CAP_DR1)
 	{
@@ -96,6 +102,8 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 	DecoderHeight = height;
 }
 
+#include <M2.Helpers.WinRT.h>
+
 HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()
 {
 	HRESULT hr = S_OK;
@@ -118,6 +126,11 @@ HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()
 		{
 			hr = E_OUTOFMEMORY;
 		}
+
+		// Using scaler: allocate a new frame from buffer pool
+		hr = FillLinesAndBuffer(this->m_VideoBufferLineSize, this->m_VideoBufferData, &this->m_VideoBufferReference);
+
+		this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBufferReference->data, this->m_VideoBufferReference->size);
 	}
 
 	return hr;
@@ -134,7 +147,16 @@ UncompressedVideoSampleProvider::~UncompressedVideoSampleProvider()
 	{
 		av_buffer_pool_uninit(&m_pBufferPool);
 	}
+
+
+
+	if (nullptr != this->m_VideoBufferReference)
+	{
+		free_buffer(this->m_VideoBufferReference);
+	}
 }
+
+
 
 HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration)
 {
@@ -159,24 +181,15 @@ HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 		}
 		else
 		{
-			// Using scaler: allocate a new frame from buffer pool
-			int linesize[4];
-			uint8_t* data[4];
-			AVBufferRef* buffer;
-
-			hr = FillLinesAndBuffer(linesize, data, &buffer);
-			if (SUCCEEDED(hr))
+			// Convert to output format using FFmpeg software scaler
+			if (sws_scale(m_pSwsCtx, (const uint8_t **)(avFrame->data), avFrame->linesize, 0, m_pAvCodecCtx->height, this->m_VideoBufferData, this->m_VideoBufferLineSize) > 0)
 			{
-				// Convert to output format using FFmpeg software scaler
-				if (sws_scale(m_pSwsCtx, (const uint8_t **)(avFrame->data), avFrame->linesize, 0, m_pAvCodecCtx->height, data, linesize) > 0)
-				{
-					*pBuffer = NativeBufferFactory::CreateNativeBuffer(buffer->data, buffer->size, free_buffer, buffer);
-				}
-				else
-				{
-					free_buffer(buffer);
-					hr = E_FAIL;
-				}
+				*pBuffer = this->m_VideoBufferObject;
+			}
+			else
+			{
+				free_buffer(this->m_VideoBufferReference);
+				hr = E_FAIL;
 			}
 		}
 	}

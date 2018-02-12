@@ -6,6 +6,8 @@
 #include "pch.h"
 #include "MainPage.xaml.h"
 
+#include "M2AsyncHelpers.h"
+
 using namespace Violet;
 
 using namespace Platform;
@@ -24,37 +26,48 @@ using namespace FFmpegInterop;
 using namespace Windows::UI;
 using namespace Windows::UI::ViewManagement;
 
+using Platform::Box;
+using Platform::IBox;
+
+
+
+
 // 设置暗黑风标题栏颜色
 void SetDarkTitleBarColor(
 	_In_ ApplicationViewTitleBar ^TitleBar)
 {
+	
+
+	IBox<Color>^ ColorWhite = ref new Box<Color>(Colors::White);
+	IBox<Color>^ ColorBlack = ref new Box<Color>(Colors::Black);
+	IBox<Color>^ ColorGray = ref new Box<Color>(Colors::Gray);
+	
 	// 标题栏
 
-	TitleBar->ForegroundColor = Colors::White;
-	TitleBar->BackgroundColor = Colors::Black;
+	TitleBar->ForegroundColor = ColorWhite;
+	TitleBar->BackgroundColor = ColorBlack;
 
 	// 非活动状态标题栏
 
-	TitleBar->InactiveForegroundColor = Colors::Gray;
-	TitleBar->InactiveBackgroundColor = Colors::Black;
+	TitleBar->InactiveForegroundColor = ColorGray;
+	TitleBar->InactiveBackgroundColor = ColorBlack;
 
 	// 标题栏按钮
 
-	TitleBar->ButtonForegroundColor = Colors::White;
-	TitleBar->ButtonBackgroundColor = Colors::Black;
+	TitleBar->ButtonForegroundColor = ColorWhite;
+	TitleBar->ButtonBackgroundColor = ColorBlack;
 
 	// 非活动状态标题栏按钮
 
-	TitleBar->ButtonInactiveForegroundColor = Colors::White;
-	TitleBar->ButtonInactiveBackgroundColor = Colors::Black;
+	TitleBar->ButtonInactiveForegroundColor = ColorWhite;
+	TitleBar->ButtonInactiveBackgroundColor = ColorBlack;
 
 	// 当指针位于标题栏按钮
 
-	TitleBar->ButtonHoverForegroundColor = Colors::White;
-	TitleBar->ButtonHoverBackgroundColor = Colors::Gray;
+	TitleBar->ButtonHoverForegroundColor = ColorWhite;
+	TitleBar->ButtonHoverBackgroundColor = ColorGray;
 }
 
-using namespace Concurrency;
 using namespace Windows::UI::Popups;
 
 // 显示错误信息
@@ -62,10 +75,7 @@ void DisplayErrorMessage(Platform::String^ message)
 {
 	auto errorDialog = ref new MessageDialog(message);
 
-	create_task(errorDialog->ShowAsync()).then([](IUICommand^ UICommand)
-	{
-
-	});
+	errorDialog->ShowAsync();
 }
 
 
@@ -85,71 +95,56 @@ void Violet::MainPage::OpenMediaFile(Windows::Storage::StorageFile^ Item)
 {
 	if (Item)
 	{
-		this->HeaderTitle->Text = Item->Path;
-
 		using namespace Windows::Media::Core;
-
-		MediaSource ^Source = MediaSource::CreateFromStorageFile(Item);
-
-		using namespace Concurrency;
 		using namespace Windows::Storage;
 		using namespace Windows::Storage::Streams;
 
-
-
-		// Open StorageFile as IRandomAccessStream to be passed to FFmpegInteropMSS
-		create_task(Item->OpenAsync(FileAccessMode::Read)).then([this, Item](task<IRandomAccessStream^> stream)
+		try
 		{
-			try
+			IRandomAccessStream^ readStream = M2AsyncWait(Item->OpenAsync(FileAccessMode::Read));
+			
+			// Read toggle switches states and use them to setup FFmpeg MSS
+			bool forceDecodeAudio = true; //toggleSwitchAudioDecode->IsOn;
+			bool forceDecodeVideo = true; //toggleSwitchVideoDecode->IsOn;
+
+			// Instantiate FFmpegInteropMSS using the opened local file stream
+			FFmpegMSS = FFmpegInteropMSS::CreateFFmpegInteropMSSFromStream(readStream, forceDecodeAudio, forceDecodeVideo);
+			if (FFmpegMSS != nullptr)
 			{
-				// Read toggle switches states and use them to setup FFmpeg MSS
-				bool forceDecodeAudio = true; //toggleSwitchAudioDecode->IsOn;
-				bool forceDecodeVideo = true; //toggleSwitchVideoDecode->IsOn;
+				MediaStreamSource^ mss = FFmpegMSS->GetMediaStreamSource();
 
-											  // Instantiate FFmpegInteropMSS using the opened local file stream
-				IRandomAccessStream^ readStream = stream.get();
-				FFmpegMSS = FFmpegInteropMSS::CreateFFmpegInteropMSSFromStream(readStream, forceDecodeAudio, forceDecodeVideo);
-				if (FFmpegMSS != nullptr)
+				if (mss)
 				{
-					MediaStreamSource^ mss = FFmpegMSS->GetMediaStreamSource();
-
-					if (mss)
+					// Pass MediaStreamSource to Media Element
+					M2ExecuteOnUIThread([this, mss, Item]()
 					{
-						// Pass MediaStreamSource to Media Element
+						this->HeaderTitle->Text = Item->Path;
 						this->MediaPlayerControl->SetMediaStreamSource(mss);
 
-						// Close control panel after file open
-						//Splitter->IsPaneOpen = false;
-					}
-					else
-					{
-						//DisplayErrorMessage("Cannot open media");
-					}
+						// 播放开始后隐藏面板
+						this->Splitter->IsPaneOpen = false;
+					});
+
+
+					
+
+					// Close control panel after file open
+					//Splitter->IsPaneOpen = false;
 				}
 				else
 				{
 					//DisplayErrorMessage("Cannot open media");
 				}
 			}
-			catch (COMException^ ex)
+			else
 			{
-				//DisplayErrorMessage(ex->Message);
+				//DisplayErrorMessage("Cannot open media");
 			}
-		});
-
-
-		// Open StorageFile as IRandomAccessStream to be passed to FFmpegInteropMSS
-		/*create_task(Item->OpenAsync(FileAccessMode::Read)).then([this, Item, Source](task<IRandomAccessStream^> stream)
+		}
+		catch (COMException^ ex)
 		{
-		TimedTextSource ^txtsrc = TimedTextSource::CreateFromStream(stream.get());
-		Source->ExternalTimedTextSources->Clear();
-		Source->ExternalTimedTextSources->Append(txtsrc);
-		});*/
-
-		//this->MediaPlayerControl->SetPlaybackSource(Source);
-
-		// 播放开始后隐藏面板
-		this->Splitter->IsPaneOpen = false;
+			//DisplayErrorMessage(ex->Message);
+		}
 	}
 }
 
@@ -207,7 +202,6 @@ void Violet::MainPage::TextBox_KeyUp(Platform::Object^ sender, Windows::UI::Xaml
 
 void Violet::MainPage::AppBarButton_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e)
 {
-	using namespace Concurrency;
 	using namespace Windows::Storage;
 	using namespace Windows::Storage::Pickers;
 
@@ -217,8 +211,15 @@ void Violet::MainPage::AppBarButton_Click(Platform::Object^ sender, Windows::UI:
 	openPicker->SuggestedStartLocation = PickerLocationId::ComputerFolder;
 	openPicker->FileTypeFilter->Append(L"*");
 
-	create_task(openPicker->PickSingleFileAsync()).then([this](StorageFile^ file)
+	IAsyncOperation<StorageFile^>^ Operation = openPicker->PickSingleFileAsync();
+
+	M2::CThread([this, Operation]()
 	{
-		this->OpenMediaFile(file);
-	});
+		StorageFile^ File = M2AsyncWait(Operation);
+
+		if (nullptr != File)
+		{
+			this->OpenMediaFile(File);
+		}
+	});;
 }

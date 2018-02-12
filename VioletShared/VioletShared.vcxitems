@@ -1,0 +1,30 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Label="Globals">
+    <MSBuildAllProjects>$(MSBuildAllProjects);$(MSBuildThisFileFullPath)</MSBuildAllProjects>
+    <HasSharedItems>true</HasSharedItems>
+    <ItemsProjectGuid>{9c232a49-e228-4192-8920-c4baf938e73a}</ItemsProjectGuid>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories);$(MSBuildThisFileDirectory)</AdditionalIncludeDirectories>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ProjectCapability Include="SourceItemsFromImports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="$(MSBuildThisFileDirectory)M2AsyncHelpers.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)M2BaseHelpers.cpp" />
+    <ClCompile Include="$(MSBuildThisFileDirectory)M2CXHelpers.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="$(MSBuildThisFileDirectory)M2AsyncHelpers.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)M2BaseHelpers.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)M2CXHelpers.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)M2Object.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)M2RemoveReference.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)M2Thread.h" />
+    <ClInclude Include="$(MSBuildThisFileDirectory)VioletVersion.h" />
+  </ItemGroup>
+</Project>

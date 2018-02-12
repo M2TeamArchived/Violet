@@ -60,6 +60,12 @@ namespace FFmpegInterop
 		bool m_top_field_first;
 		AVChromaLocation m_chroma_location;
 		bool m_bUseScaler;
+
+		AVBufferRef* m_VideoBufferReference = nullptr;
+		IBuffer^ m_VideoBufferObject = nullptr;
+
+		int m_VideoBufferLineSize[4];
+		uint8_t* m_VideoBufferData[4];
 	};
 }
 

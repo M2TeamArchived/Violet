@@ -15,8 +15,12 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VioletCore", "VioletCore\Vi
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FFmpegUniversalSDK", "ThirdParty\FFmpegUniversalSDK\FFmpegUniversalSDK.vcxitems", "{B4F7B4B6-D656-4FB5-A988-C62B38A3540C}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VioletShared", "VioletShared\VioletShared.vcxitems", "{9C232A49-E228-4192-8920-C4BAF938E73A}"
+EndProject
 Global
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		VioletShared\VioletShared.vcxitems*{2b407187-25f2-4e71-816f-ed7e6cf0578e}*SharedItemsImports = 4
+		VioletShared\VioletShared.vcxitems*{9c232a49-e228-4192-8920-c4baf938e73a}*SharedItemsImports = 9
 		ThirdParty\FFmpegUniversalSDK\FFmpegUniversalSDK.vcxitems*{b4f7b4b6-d656-4fb5-a988-c62b38a3540c}*SharedItemsImports = 9
 		ThirdParty\FFmpegUniversalSDK\FFmpegUniversalSDK.vcxitems*{f904022d-9985-4b5d-ae97-54f0cab5e791}*SharedItemsImports = 4
 	EndGlobalSection

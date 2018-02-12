@@ -225,6 +225,7 @@
     <ClInclude Include="FFmpegInteropMSS.h" />
     <ClInclude Include="FFmpegReader.h" />
     <ClInclude Include="ILogProvider.h" />
+    <ClInclude Include="M2.Helpers.WinRT.h" />
     <ClInclude Include="MediaSampleProvider.h" />
     <ClInclude Include="MediaThumbnailData.h" />
     <ClInclude Include="NativeBuffer.h" />
@@ -240,6 +241,7 @@
     <ClCompile Include="FFmpegInteropLogging.cpp" />
     <ClCompile Include="FFmpegInteropMSS.cpp" />
     <ClCompile Include="FFmpegReader.cpp" />
+    <ClCompile Include="M2.Helpers.WinRT.cpp" />
     <ClCompile Include="MediaSampleProvider.cpp" />
     <ClCompile Include="NativeBufferFactory.cpp" />
     <ClCompile Include="pch.cpp">
