@@ -2,8 +2,8 @@
 
 ## License
 - MIT License
-- The FFmpegInterop source code used in VioletCore is licensed under Apache 2.0
-  License.
+- The FFmpegInterop(https://github.com/lukasf/FFmpegInterop) source code used
+  in VioletCore is licensed under Apache 2.0 License.
 
 ## Third-party
 - FFmpegUniversalSDK

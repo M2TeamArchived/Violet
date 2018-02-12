@@ -29,7 +29,7 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{f904022d-9985-4b5d-ae97-54f0cab5e791}</ProjectGuid>
     <Keyword>WindowsRuntimeComponent</Keyword>
-    <RootNamespace>VioletCore</RootNamespace>
+    <RootNamespace>FFmpegInterop</RootNamespace>
     <DefaultLanguage>zh-CN</DefaultLanguage>
     <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
     <AppContainerApplication>true</AppContainerApplication>
@@ -220,27 +220,28 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="CritSec.h" />
+    <ClInclude Include="FFmpegInteropConfig.h" />
     <ClInclude Include="FFmpegInteropLogging.h" />
     <ClInclude Include="FFmpegInteropMSS.h" />
     <ClInclude Include="FFmpegReader.h" />
-    <ClInclude Include="H264AVCSampleProvider.h" />
-    <ClInclude Include="H264SampleProvider.h" />
     <ClInclude Include="ILogProvider.h" />
     <ClInclude Include="MediaSampleProvider.h" />
     <ClInclude Include="MediaThumbnailData.h" />
+    <ClInclude Include="NativeBuffer.h" />
+    <ClInclude Include="NativeBufferFactory.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="UncompressedAudioSampleProvider.h" />
     <ClInclude Include="UncompressedSampleProvider.h" />
     <ClInclude Include="UncompressedVideoSampleProvider.h" />
+    <ClInclude Include="VideoFrame.h" />
     <ClInclude Include="VioletCore.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="FFmpegInteropLogging.cpp" />
     <ClCompile Include="FFmpegInteropMSS.cpp" />
     <ClCompile Include="FFmpegReader.cpp" />
-    <ClCompile Include="H264AVCSampleProvider.cpp" />
-    <ClCompile Include="H264SampleProvider.cpp" />
     <ClCompile Include="MediaSampleProvider.cpp" />
+    <ClCompile Include="NativeBufferFactory.cpp" />
     <ClCompile Include="pch.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>

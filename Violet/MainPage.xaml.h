@@ -17,5 +17,13 @@ namespace Violet
 	public:
 		MainPage();
 
+	private:
+		FFmpegInterop::FFmpegInteropMSS^ FFmpegMSS;
+
+		void OpenMediaFile(Windows::Storage::StorageFile^ Item);
+
+		void MediaPlayerControl_MediaFailed(Platform::Object^ sender, Windows::UI::Xaml::ExceptionRoutedEventArgs^ e);
+		void TextBox_KeyUp(Platform::Object^ sender, Windows::UI::Xaml::Input::KeyRoutedEventArgs^ e);
+		void AppBarButton_Click(Platform::Object^ sender, Windows::UI::Xaml::RoutedEventArgs^ e);
 	};
 }

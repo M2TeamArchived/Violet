@@ -20,12 +20,6 @@
     <ClCompile Include="FFmpegReader.cpp">
       <Filter>FFmpegInterop</Filter>
     </ClCompile>
-    <ClCompile Include="H264AVCSampleProvider.cpp">
-      <Filter>FFmpegInterop</Filter>
-    </ClCompile>
-    <ClCompile Include="H264SampleProvider.cpp">
-      <Filter>FFmpegInterop</Filter>
-    </ClCompile>
     <ClCompile Include="MediaSampleProvider.cpp">
       <Filter>FFmpegInterop</Filter>
     </ClCompile>
@@ -39,6 +33,9 @@
       <Filter>FFmpegInterop</Filter>
     </ClCompile>
     <ClCompile Include="VioletCore.cpp" />
+    <ClCompile Include="NativeBufferFactory.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -52,12 +49,6 @@
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
     <ClInclude Include="FFmpegReader.h">
-      <Filter>FFmpegInterop</Filter>
-    </ClInclude>
-    <ClInclude Include="H264AVCSampleProvider.h">
-      <Filter>FFmpegInterop</Filter>
-    </ClInclude>
-    <ClInclude Include="H264SampleProvider.h">
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
     <ClInclude Include="ILogProvider.h">
@@ -79,5 +70,17 @@
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
     <ClInclude Include="VioletCore.h" />
+    <ClInclude Include="FFmpegInteropConfig.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeBuffer.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="NativeBufferFactory.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="VideoFrame.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

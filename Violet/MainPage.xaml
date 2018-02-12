@@ -8,6 +8,56 @@
     mc:Ignorable="d">
 
     <Grid Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
+        <SplitView x:Name="Splitter" Grid.Row="1">
+            <!-- 控制面板 -->
+            <SplitView.Pane>
+                <StackPanel VerticalAlignment="Stretch" Margin="14">
+
+                    <TextBlock Text="Open local file or URI" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <StackPanel VerticalAlignment="Stretch" Margin="14">
+                        <Button Content="Open local file" Click="AppBarButton_Click"/>
+                        <TextBox PlaceholderText="Please input the URI and enter"
+                                 InputScope="Url" TextWrapping="Wrap" MaxHeight="210" KeyUp="TextBox_KeyUp"/>
+                    </StackPanel>
+
+                    <TextBlock Text="About" Style="{StaticResource SubtitleTextBlockStyle}"/>
+                    <TextBlock x:Name="Version">
+                        <Run Text="Project Violet 0.1.1"/>
+                        <LineBreak/>
+                        <Run Text="© M2-Team. All rights reserved."/>
+                    </TextBlock>
+
+                </StackPanel>
+            </SplitView.Pane>
+
+            <MediaElement x:Name="MediaPlayerControl" 
+                          AutoPlay="True"
+                          AreTransportControlsEnabled="True"
+                          AudioCategory="ForegroundOnlyMedia"
+                          Grid.ColumnSpan="2"
+                          Grid.RowSpan="2" 
+                          MediaFailed="MediaPlayerControl_MediaFailed" />
+
+        </SplitView>
+
+        <StackPanel Grid.Row="0" x:Name="HeaderPanel" Orientation="Horizontal">
+            <Border Background="{ThemeResource SystemControlBackgroundChromeMediumBrush}" >
+                <ToggleButton x:Name="toggleButton" 
+                              VerticalAlignment="Top"
+                              Foreground="{ThemeResource ApplicationForegroundThemeBrush}"
+                              IsChecked="{Binding ElementName=Splitter, Path=IsPaneOpen, Mode=TwoWay}">
+                    <ToggleButton.Content>
+                        <FontIcon FontFamily="Segoe MDL2 Assets" Foreground="White" Glyph="&#xE700;"/>
+                    </ToggleButton.Content>
+                </ToggleButton>
+            </Border>
+
+            <TextBlock x:Name="HeaderTitle" Text="Click the left button to open a file or do something else" VerticalAlignment="Center" Margin="10,0,0,0"/>
+        </StackPanel>
     </Grid>
 </Page>

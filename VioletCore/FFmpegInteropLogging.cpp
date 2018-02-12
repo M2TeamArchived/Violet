@@ -22,6 +22,11 @@
 
 using namespace FFmpegInterop;
 
+extern "C"
+{
+#include <libavutil/log.h>
+}
+
 ILogProvider^ FFmpegInteropLogging::s_pLogProvider = nullptr;
 
 FFmpegInteropLogging::FFmpegInteropLogging()
