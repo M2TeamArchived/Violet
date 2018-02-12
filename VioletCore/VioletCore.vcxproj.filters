@@ -1,0 +1,83 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resources">
+      <UniqueIdentifier>939cbb63-cad6-43cc-b0a2-e6357fc2516d</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tga;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="FFmpegInterop">
+      <UniqueIdentifier>{2949d2b8-31d0-4f27-be5d-c6934838426b}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="pch.cpp" />
+    <ClCompile Include="FFmpegInteropLogging.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="FFmpegInteropMSS.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="FFmpegReader.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="H264AVCSampleProvider.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="H264SampleProvider.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="MediaSampleProvider.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="UncompressedAudioSampleProvider.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="UncompressedSampleProvider.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="UncompressedVideoSampleProvider.cpp">
+      <Filter>FFmpegInterop</Filter>
+    </ClCompile>
+    <ClCompile Include="VioletCore.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="FFmpegInteropLogging.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="CritSec.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="FFmpegInteropMSS.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="FFmpegReader.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="H264AVCSampleProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="H264SampleProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="ILogProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="MediaSampleProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="MediaThumbnailData.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="UncompressedAudioSampleProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="UncompressedSampleProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="UncompressedVideoSampleProvider.h">
+      <Filter>FFmpegInterop</Filter>
+    </ClInclude>
+    <ClInclude Include="VioletCore.h" />
+  </ItemGroup>
+</Project>
