@@ -86,38 +86,6 @@ FFmpegInteropMSS::~FFmpegInteropMSS()
 	mutexGuard.unlock();
 }
 
-IAsyncOperation<FFmpegInteropMSS^>^ FFmpegInteropMSS::CreateFromStreamAsync(IRandomAccessStream^ stream, FFmpegInteropConfig^ config)
-{
-	return create_async([stream, config]
-	{
-		return create_task([stream, config]
-		{
-			auto result = CreateFromStream(stream, config, nullptr);
-			if (result == nullptr)
-			{
-				throw ref new Exception(E_FAIL, "Could not create MediaStreamSource.");
-			}
-			return result;
-		});
-	});
-};
-
-IAsyncOperation<FFmpegInteropMSS^>^ FFmpegInteropMSS::CreateFromUriAsync(String^ uri, FFmpegInteropConfig^ config)
-{
-	return create_async([uri, config]
-	{
-		return create_task([uri, config]
-		{
-			auto result = CreateFromUri(uri, config);
-			if (result == nullptr)
-			{
-				throw ref new Exception(E_FAIL, "Could not create MediaStreamSource.");
-			}
-			return result;
-		});
-	});
-};
-
 FFmpegInteropMSS^ FFmpegInteropMSS::CreateFromStream(IRandomAccessStream^ stream, FFmpegInteropConfig^ config, MediaStreamSource^ mss)
 {
 	auto interopMSS = ref new FFmpegInteropMSS(config);
@@ -138,55 +106,6 @@ FFmpegInteropMSS^ FFmpegInteropMSS::CreateFromUri(String^ uri, FFmpegInteropConf
 		throw ref new Exception(hr, "Failed to open media.");
 	}
 	return interopMSS;
-}
-
-FFmpegInteropMSS^ FFmpegInteropMSS::CreateFFmpegInteropMSSFromStream(IRandomAccessStream^ stream, bool forceAudioDecode, bool forceVideoDecode, PropertySet^ ffmpegOptions, MediaStreamSource^ mss)
-{
-	auto config = ref new FFmpegInteropConfig();
-	if (ffmpegOptions != nullptr)
-	{
-		config->FFmpegOptions = ffmpegOptions;
-	}
-	try
-	{
-		return CreateFromStream(stream, config, nullptr);
-	}
-	catch (...)
-	{
-		return nullptr;
-	}
-}
-
-FFmpegInteropMSS^ FFmpegInteropMSS::CreateFFmpegInteropMSSFromStream(IRandomAccessStream^ stream, bool forceAudioDecode, bool forceVideoDecode, PropertySet^ ffmpegOptions)
-{
-	return CreateFFmpegInteropMSSFromStream(stream, forceAudioDecode, forceVideoDecode, nullptr, nullptr);
-}
-
-FFmpegInteropMSS^ FFmpegInteropMSS::CreateFFmpegInteropMSSFromStream(IRandomAccessStream^ stream, bool forceAudioDecode, bool forceVideoDecode)
-{
-	return CreateFFmpegInteropMSSFromStream(stream, forceAudioDecode, forceVideoDecode, nullptr);
-}
-
-FFmpegInteropMSS^ FFmpegInteropMSS::CreateFFmpegInteropMSSFromUri(String^ uri, bool forceAudioDecode, bool forceVideoDecode, PropertySet^ ffmpegOptions)
-{
-	auto config = ref new FFmpegInteropConfig();
-	if (ffmpegOptions != nullptr)
-	{
-		config->FFmpegOptions = ffmpegOptions;
-	}
-	try
-	{
-		return CreateFromUri(uri, config);
-	}
-	catch (...)
-	{
-		return nullptr;
-	}
-}
-
-FFmpegInteropMSS^ FFmpegInteropMSS::CreateFFmpegInteropMSSFromUri(String^ uri, bool forceAudioDecode, bool forceVideoDecode)
-{
-	return CreateFFmpegInteropMSSFromUri(uri, forceAudioDecode, forceVideoDecode, nullptr);
 }
 
 MediaStreamSource^ FFmpegInteropMSS::GetMediaStreamSource()
@@ -606,39 +525,6 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 	return hr;
 }
 
-MediaThumbnailData ^ FFmpegInterop::FFmpegInteropMSS::ExtractThumbnail()
-{
-	if (thumbnailStreamIndex != AVERROR_STREAM_NOT_FOUND)
-	{
-		// FFmpeg identifies album/cover art from a music file as a video stream
-		// Avoid creating unnecessarily video stream from this album/cover art
-		if (avFormatCtx->streams[thumbnailStreamIndex]->disposition == AV_DISPOSITION_ATTACHED_PIC)
-		{
-			auto imageStream = avFormatCtx->streams[thumbnailStreamIndex];
-			//save album art to file.
-			String^ extension = ".jpeg";
-			switch (imageStream->codecpar->codec_id)
-			{
-			case AV_CODEC_ID_MJPEG:
-			case AV_CODEC_ID_MJPEGB:
-			case AV_CODEC_ID_JPEG2000:
-			case AV_CODEC_ID_JPEGLS: extension = ".jpeg"; break;
-			case AV_CODEC_ID_PNG: extension = ".png"; break;
-			case AV_CODEC_ID_BMP: extension = ".bmp"; break;
-			}
-
-
-			auto vector = ArrayReference<uint8_t>(imageStream->attached_pic.data, imageStream->attached_pic.size);
-			DataWriter^ writer = ref new DataWriter();
-			writer->WriteBytes(vector);
-
-			return (ref new MediaThumbnailData(writer->DetachBuffer(), extension));
-		}
-	}
-
-	return nullptr;
-}
-
 HRESULT FFmpegInteropMSS::ConvertCodecName(const char* codecName, String^ *outputCodecName)
 {
 	HRESULT hr = S_OK;
@@ -751,7 +637,8 @@ HRESULT FFmpegInteropMSS::ParseOptions(PropertySet^ ffmpegOptions)
 {
 	HRESULT hr = S_OK;
 
-	// Convert FFmpeg options given in PropertySet to AVDictionary. List of options can be found in https://www.ffmpeg.org/ffmpeg-protocols.html
+	// Convert FFmpeg options given in PropertySet to AVDictionary. List of 
+	// options can be found in https://www.ffmpeg.org/ffmpeg-protocols.html
 	if (ffmpegOptions != nullptr)
 	{
 		auto options = ffmpegOptions->First();
@@ -944,71 +831,3 @@ static int lock_manager(void **mtx, enum AVLockOp op)
 	}
 	return 1;
 }
-
-IAsyncOperation<VideoFrame^>^ FFmpegInteropMSS::ExtractVideoFrameAsync(IRandomAccessStream^ stream, TimeSpan position, bool exactSeek, int maxFrameSkip)
-{
-	return create_async([stream, position, exactSeek, maxFrameSkip]
-	{
-		return create_task([stream, position, exactSeek, maxFrameSkip]
-		{
-			auto cfg = ref new FFmpegInteropConfig();
-			cfg->MaxVideoThreads = 1;
-			cfg->VideoOutputAllowIyuv = false;
-			cfg->VideoOutputAllowNv12 = false;
-			cfg->VideoOutputAllowBgra8 = true;
-			cfg->IsFrameGrabber = true;
-
-			auto interopMSS = ref new FFmpegInteropMSS(cfg);
-			if (FAILED(interopMSS->CreateMediaStreamSource(stream, nullptr)))
-			{
-				throw ref new Exception(E_FAIL, "Unable to open file.");
-			}
-			if (interopMSS->videoSampleProvider == nullptr)
-			{
-				throw ref new Exception(E_FAIL, "No video stream found in file (or no suitable decoder available).");
-			}
-
-			bool seekSucceeded = false;
-			if (interopMSS->Duration.Duration > position.Duration)
-			{
-				seekSucceeded = SUCCEEDED(interopMSS->Seek(position));
-			}
-
-			int framesSkipped = 0;
-			MediaStreamSample^ lastSample = nullptr;
-			while (true)
-			{
-				auto sample = interopMSS->videoSampleProvider->GetNextSample();
-				if (sample == nullptr)
-				{
-					// if we hit end of stream, use last decoded sample (if any), otherwise fail
-					if (lastSample != nullptr)
-					{
-						sample = lastSample;
-						seekSucceeded = false;
-					}
-					else
-					{
-						throw ref new Exception(E_FAIL, "Failed to decode video frame.");
-					}
-				}
-				else
-				{
-					lastSample = sample;
-				}
-
-				// if exact seek, continue decoding until we have the right sample
-				if (exactSeek && seekSucceeded && (position.Duration - sample->Timestamp.Duration > sample->Duration.Duration / 2) && 
-				    (maxFrameSkip <= 0 || framesSkipped++ < maxFrameSkip))
-				{
-					continue;
-				}
-
-				auto result = ref new VideoFrame(sample->Buffer,
-					interopMSS->videoSampleProvider->m_pAvCodecCtx->width,
-					interopMSS->videoSampleProvider->m_pAvCodecCtx->height);
-				return result;
-			}
-		});
-	});
-};

@@ -43,65 +43,13 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 		this->m_VideoBufferLineSize[i] = 0;
 		this->m_VideoBufferData[i] = nullptr;
 	}
-	
-	if (config->VideoOutputAllowIyuv && (m_pAvCodecCtx->pix_fmt == AV_PIX_FMT_YUV420P || m_pAvCodecCtx->pix_fmt == AV_PIX_FMT_YUVJ420P)
-		&& m_pAvCodecCtx->codec->capabilities & AV_CODEC_CAP_DR1)
-	{
-		// if format is yuv and yuv is allowed and codec supports direct buffer decoding, use yuv
-		m_OutputPixelFormat = m_pAvCodecCtx->pix_fmt == AV_PIX_FMT_YUVJ420P ? AV_PIX_FMT_YUVJ420P : AV_PIX_FMT_YUV420P;
-		OutputMediaSubtype = MediaEncodingSubtypes::Iyuv;
-	}
-	else if (config->VideoOutputAllowNv12)
-	{
-		// NV12 is generally the preferred format
-		m_OutputPixelFormat = AV_PIX_FMT_NV12;
-		OutputMediaSubtype = MediaEncodingSubtypes::Nv12;
-	}
-	else if (config->VideoOutputAllowIyuv)
-	{
-		m_OutputPixelFormat = m_pAvCodecCtx->pix_fmt == AV_PIX_FMT_YUVJ420P 	? AV_PIX_FMT_YUVJ420P : AV_PIX_FMT_YUV420P;
-		OutputMediaSubtype = MediaEncodingSubtypes::Iyuv;
-	}
-	else if (config->VideoOutputAllowBgra8)
-	{
-		m_OutputPixelFormat = AV_PIX_FMT_BGRA;
-		OutputMediaSubtype = MediaEncodingSubtypes::Bgra8;
-	}
-	else // if no format is allowed, we still use NV12
-	{
-		m_OutputPixelFormat = AV_PIX_FMT_NV12;
-		OutputMediaSubtype = MediaEncodingSubtypes::Nv12;
-	}
+
+	// We use NV12 format, NV12 is generally the preferred format.
+	m_OutputPixelFormat = AV_PIX_FMT_NV12;
+	OutputMediaSubtype = MediaEncodingSubtypes::Nv12;
 
 	auto width = avCodecCtx->width;
 	auto height = avCodecCtx->height;
-
-	if (m_pAvCodecCtx->pix_fmt == m_OutputPixelFormat)
-	{
-		if (m_pAvCodecCtx->codec->capabilities & AV_CODEC_CAP_DR1)
-		{
-			// This codec supports direct buffer decoding.
-			// Get decoder frame size and override get_buffer2...
-			avcodec_align_dimensions(m_pAvCodecCtx, &width, &height);
-
-			m_pAvCodecCtx->get_buffer2 = get_buffer2;
-			m_pAvCodecCtx->opaque = (void*)this;
-		}
-		else
-		{
-			m_bUseScaler = true;
-		}
-	}
-	else
-	{
-		// Scaler required to convert pixel format
-		m_bUseScaler = true;
-	}
-
-	if (!m_bUseScaler)
-	{
-
-	}
 
 	DecoderWidth = width;
 	DecoderHeight = height;
@@ -112,7 +60,7 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()
 {
 	HRESULT hr = S_OK;
-	if (m_bUseScaler && !m_pSwsCtx)
+	if (!m_pSwsCtx)
 	{
 		// Setup software scaler to convert frame to output pixel type
 		m_pSwsCtx = sws_getContext(
@@ -153,15 +101,11 @@ UncompressedVideoSampleProvider::~UncompressedVideoSampleProvider()
 		av_buffer_pool_uninit(&m_pBufferPool);
 	}
 
-
-
 	if (nullptr != this->m_VideoBufferReference)
 	{
 		free_buffer(this->m_VideoBufferReference);
 	}
 }
-
-
 
 HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration)
 {
@@ -171,31 +115,15 @@ HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 
 	if (SUCCEEDED(hr))
 	{
-		if (!m_bUseScaler)
+		// Convert to output format using FFmpeg software scaler
+		if (sws_scale(m_pSwsCtx, (const uint8_t **)(avFrame->data), avFrame->linesize, 0, m_pAvCodecCtx->height, this->m_VideoBufferData, this->m_VideoBufferLineSize) > 0)
 		{
-			// Using direct buffer: just create a buffer reference to hand out to MSS pipeline
-			auto bufferRef = av_buffer_ref(avFrame->buf[0]);
-			if (bufferRef)
-			{
-				*pBuffer = NativeBufferFactory::CreateNativeBuffer(bufferRef->data, bufferRef->size, free_buffer, bufferRef);
-			}
-			else
-			{
-				hr = E_FAIL;
-			}
+			*pBuffer = this->m_VideoBufferObject;
 		}
 		else
 		{
-			// Convert to output format using FFmpeg software scaler
-			if (sws_scale(m_pSwsCtx, (const uint8_t **)(avFrame->data), avFrame->linesize, 0, m_pAvCodecCtx->height, this->m_VideoBufferData, this->m_VideoBufferLineSize) > 0)
-			{
-				*pBuffer = this->m_VideoBufferObject;
-			}
-			else
-			{
-				free_buffer(this->m_VideoBufferReference);
-				hr = E_FAIL;
-			}
+			free_buffer(this->m_VideoBufferReference);
+			hr = E_FAIL;
 		}
 	}
 
@@ -316,19 +244,4 @@ AVBufferRef* UncompressedVideoSampleProvider::AllocateBuffer(int totalSize)
 	}
 
 	return buffer;
-}
-
-int UncompressedVideoSampleProvider::get_buffer2(AVCodecContext *avCodecContext, AVFrame *frame, int flags)
-{
-	// If frame size changes during playback and gets larger than our buffer, we need to switch to sws_scale
-	auto provider = reinterpret_cast<UncompressedVideoSampleProvider^>(avCodecContext->opaque);
-	provider->m_bUseScaler = frame->height > provider->DecoderHeight || frame->width > provider->DecoderWidth;
-	if (provider->m_bUseScaler)
-	{
-		return avcodec_default_get_buffer2(avCodecContext, frame, flags);
-	}
-	else
-	{
-		return provider->FillLinesAndBuffer(frame->linesize, frame->data, frame->buf);
-	}
 }

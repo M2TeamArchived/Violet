@@ -41,42 +41,63 @@ HRESULT UncompressedAudioSampleProvider::AllocateResources()
 	if (SUCCEEDED(hr))
 	{
 		// Set default channel layout when the value is unknown (0)
-		int channels = m_pAvCodecCtx->profile == FF_PROFILE_AAC_HE_V2 && m_pAvCodecCtx->extradata_size != 0 ? m_pAvCodecCtx->channels * 2 : m_pAvCodecCtx->channels;
-		int64 inChannelLayout = m_pAvCodecCtx->channel_layout && (m_pAvCodecCtx->profile != FF_PROFILE_AAC_HE_V2 || m_pAvCodecCtx->extradata_size == 0) ? m_pAvCodecCtx->channel_layout : av_get_default_channel_layout(channels);
+		bool IsFFProfileAACHEV2 = (
+			m_pAvCodecCtx->profile == FF_PROFILE_AAC_HE_V2 &&
+			m_pAvCodecCtx->extradata_size != 0);
+
+		int channels = m_pAvCodecCtx->channels;
+		if (IsFFProfileAACHEV2)
+		{
+			channels *= 2;
+		}
+		int64 inChannelLayout = 0;
+		if (m_pAvCodecCtx->channel_layout && !IsFFProfileAACHEV2)
+		{
+			inChannelLayout = m_pAvCodecCtx->channel_layout;
+		}
+		else
+		{
+			inChannelLayout= av_get_default_channel_layout(channels);
+		}
 		int64 outChannelLayout = av_get_default_channel_layout(channels);
 
-		m_outputSampleFormat =
-			(m_pAvCodecCtx->sample_fmt == AV_SAMPLE_FMT_S32 || m_pAvCodecCtx->sample_fmt == AV_SAMPLE_FMT_S32P) ? AV_SAMPLE_FMT_S32 :
-			(m_pAvCodecCtx->sample_fmt == AV_SAMPLE_FMT_FLT || m_pAvCodecCtx->sample_fmt == AV_SAMPLE_FMT_FLTP) ? AV_SAMPLE_FMT_FLT :
-			AV_SAMPLE_FMT_S16;
-
-		auto needsResampler = m_outputSampleFormat != m_pAvCodecCtx->sample_fmt || outChannelLayout != inChannelLayout;
-		
-		if (needsResampler)
+		switch (m_pAvCodecCtx->sample_fmt)
 		{
-			// Set up resampler to convert to output format and channel layout.
-			m_pSwrCtx = swr_alloc_set_opts(
-				NULL,
-				outChannelLayout,
-				m_outputSampleFormat,
-				m_pAvCodecCtx->sample_rate,
-				inChannelLayout,
-				m_pAvCodecCtx->sample_fmt,
-				m_pAvCodecCtx->sample_rate,
-				0,
-				NULL);
+		case AV_SAMPLE_FMT_S32:
+		case AV_SAMPLE_FMT_S32P:
+			m_outputSampleFormat = AV_SAMPLE_FMT_S32;
+			break;
+		case AV_SAMPLE_FMT_FLT:
+		case AV_SAMPLE_FMT_FLTP:
+			m_outputSampleFormat = AV_SAMPLE_FMT_FLT;
+			break;
+		default:
+			m_outputSampleFormat = AV_SAMPLE_FMT_S16;
+			break;
+		}
 
-			if (!m_pSwrCtx)
-			{
-				hr = E_OUTOFMEMORY;
-			}
+		// Set up resampler to convert to output format and channel layout.
+		m_pSwrCtx = swr_alloc_set_opts(
+			NULL,
+			outChannelLayout,
+			m_outputSampleFormat,
+			m_pAvCodecCtx->sample_rate,
+			inChannelLayout,
+			m_pAvCodecCtx->sample_fmt,
+			m_pAvCodecCtx->sample_rate,
+			0,
+			NULL);
 
-			if (SUCCEEDED(hr))
+		if (!m_pSwrCtx)
+		{
+			hr = E_OUTOFMEMORY;
+		}
+
+		if (SUCCEEDED(hr))
+		{
+			if (swr_init(m_pSwrCtx) < 0)
 			{
-				if (swr_init(m_pSwrCtx) < 0)
-				{
-					hr = E_FAIL;
-				}
+				hr = E_FAIL;
 			}
 		}
 	}
@@ -94,36 +115,19 @@ HRESULT UncompressedAudioSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 {
 	HRESULT hr = S_OK;
 
-	if (m_pSwrCtx)
-	{
-		// Resample uncompressed frame to output format
-		uint8_t **resampledData = nullptr;
-		unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, m_pAvCodecCtx->channels, avFrame->nb_samples, m_outputSampleFormat, 0);
-		int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
+	// Resample uncompressed frame to output format
+	uint8_t **resampledData = nullptr;
+	unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, m_pAvCodecCtx->channels, avFrame->nb_samples, m_outputSampleFormat, 0);
+	int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
 
-		if (resampledDataSize < 0)
-		{
-			hr = E_FAIL;
-		}
-		else
-		{
-			auto size = min(aBufferSize, (unsigned int)(resampledDataSize * m_pAvCodecCtx->channels * av_get_bytes_per_sample(m_outputSampleFormat)));
-			*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
-		}
+	if (resampledDataSize < 0)
+	{
+		hr = E_FAIL;
 	}
 	else
 	{
-		// Using direct buffer: just create a buffer reference to hand out to MSS pipeline
-		auto bufferRef = av_buffer_ref(avFrame->buf[0]);
-		if (bufferRef)
-		{
-			auto size = min(bufferRef->size, avFrame->nb_samples * m_pAvCodecCtx->channels * av_get_bytes_per_sample(m_outputSampleFormat));
-			*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(bufferRef->data, size, free_buffer, bufferRef);
-		}
-		else
-		{
-			hr = E_FAIL;
-		}
+		auto size = min(aBufferSize, (unsigned int)(resampledDataSize * m_pAvCodecCtx->channels * av_get_bytes_per_sample(m_outputSampleFormat)));
+		*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
 	}
 
 	if (SUCCEEDED(hr))

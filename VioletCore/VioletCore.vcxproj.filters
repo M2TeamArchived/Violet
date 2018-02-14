@@ -11,9 +11,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="pch.cpp" />
-    <ClCompile Include="FFmpegInteropLogging.cpp">
-      <Filter>FFmpegInterop</Filter>
-    </ClCompile>
     <ClCompile Include="FFmpegInteropMSS.cpp">
       <Filter>FFmpegInterop</Filter>
     </ClCompile>
@@ -40,9 +37,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
-    <ClInclude Include="FFmpegInteropLogging.h">
-      <Filter>FFmpegInterop</Filter>
-    </ClInclude>
     <ClInclude Include="CritSec.h">
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
@@ -52,13 +46,7 @@
     <ClInclude Include="FFmpegReader.h">
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
-    <ClInclude Include="ILogProvider.h">
-      <Filter>FFmpegInterop</Filter>
-    </ClInclude>
     <ClInclude Include="MediaSampleProvider.h">
-      <Filter>FFmpegInterop</Filter>
-    </ClInclude>
-    <ClInclude Include="MediaThumbnailData.h">
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
     <ClInclude Include="UncompressedAudioSampleProvider.h">
@@ -78,9 +66,6 @@
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
     <ClInclude Include="NativeBufferFactory.h">
-      <Filter>FFmpegInterop</Filter>
-    </ClInclude>
-    <ClInclude Include="VideoFrame.h">
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
     <ClInclude Include="M2.Helpers.WinRT.h" />

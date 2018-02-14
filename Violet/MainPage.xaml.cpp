@@ -21,7 +21,7 @@ using namespace Windows::UI::Xaml::Input;
 using namespace Windows::UI::Xaml::Media;
 using namespace Windows::UI::Xaml::Navigation;
 
-using namespace FFmpegInterop;
+using namespace VioletCore;
 
 using namespace Windows::UI;
 using namespace Windows::UI::ViewManagement;
@@ -104,14 +104,14 @@ void Violet::MainPage::OpenMediaFile(Windows::Storage::StorageFile^ Item)
 			IRandomAccessStream^ readStream = M2AsyncWait(Item->OpenAsync(FileAccessMode::Read));
 			
 			// Read toggle switches states and use them to setup FFmpeg MSS
-			bool forceDecodeAudio = true; //toggleSwitchAudioDecode->IsOn;
-			bool forceDecodeVideo = true; //toggleSwitchVideoDecode->IsOn;
+
+			bool IsSuccess = false;
 
 			// Instantiate FFmpegInteropMSS using the opened local file stream
-			FFmpegMSS = FFmpegInteropMSS::CreateFFmpegInteropMSSFromStream(readStream, forceDecodeAudio, forceDecodeVideo);
-			if (FFmpegMSS != nullptr)
+			MSSObject = VioletCoreMSS::CreateFromStream(readStream);
+			if (MSSObject != nullptr)
 			{
-				MediaStreamSource^ mss = FFmpegMSS->GetMediaStreamSource();
+				MediaStreamSource^ mss = MSSObject->GetMediaStreamSource();
 
 				if (mss)
 				{
@@ -125,25 +125,18 @@ void Violet::MainPage::OpenMediaFile(Windows::Storage::StorageFile^ Item)
 						this->Splitter->IsPaneOpen = false;
 					});
 
-
-					
-
-					// Close control panel after file open
-					//Splitter->IsPaneOpen = false;
-				}
-				else
-				{
-					//DisplayErrorMessage("Cannot open media");
+					IsSuccess = true;
 				}
 			}
-			else
+
+			if (!IsSuccess)
 			{
-				//DisplayErrorMessage("Cannot open media");
+				DisplayErrorMessage("Cannot open media");
 			}
 		}
 		catch (COMException^ ex)
 		{
-			//DisplayErrorMessage(ex->Message);
+			DisplayErrorMessage(ex->Message);
 		}
 	}
 }
@@ -168,30 +161,33 @@ void Violet::MainPage::TextBox_KeyUp(Platform::Object^ sender, Windows::UI::Xaml
 		// Mark event as handled to prevent duplicate event to re-triggered
 		e->Handled = true;
 
-		this->HeaderTitle->Text = URIString;
+		bool IsSuccess = false;
 
-		FFmpegMSS = FFmpegInteropMSS::CreateFFmpegInteropMSSFromUri(URIString, true, true);
-		if (FFmpegMSS != nullptr)
+		MSSObject = VioletCoreMSS::CreateFromUri(URIString);
+		if (MSSObject != nullptr)
 		{
 			using namespace Windows::Media::Core;
-			MediaStreamSource^ mss = FFmpegMSS->GetMediaStreamSource();
+			MediaStreamSource^ mss = MSSObject->GetMediaStreamSource();
 
 			if (mss)
 			{
 				// Pass MediaStreamSource to Media Element
-				this->MediaPlayerControl->SetMediaStreamSource(mss);
+				M2ExecuteOnUIThread([this, mss, URIString]()
+				{
+					this->HeaderTitle->Text = URIString;
+					this->MediaPlayerControl->SetMediaStreamSource(mss);
 
-				// Close control panel after opening media
-				//Splitter->IsPaneOpen = false;
-			}
-			else
-			{
-				//DisplayErrorMessage("Cannot open media");
+					// 播放开始后隐藏面板
+					this->Splitter->IsPaneOpen = false;
+				});
+					
+				IsSuccess = true;
 			}
 		}
-		else
+		
+		if (!IsSuccess)
 		{
-			//DisplayErrorMessage("Cannot open media");
+			DisplayErrorMessage("Cannot open media");
 		}
 
 		// 播放开始后隐藏面板

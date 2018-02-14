@@ -18,7 +18,7 @@ namespace Violet
 		MainPage();
 
 	private:
-		FFmpegInterop::FFmpegInteropMSS^ FFmpegMSS;
+		VioletCore::VioletCoreMSS^ MSSObject;
 
 		void OpenMediaFile(Windows::Storage::StorageFile^ Item);
 

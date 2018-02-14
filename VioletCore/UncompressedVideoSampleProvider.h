@@ -51,7 +51,6 @@ namespace FFmpegInterop
 		HRESULT InitializeScalerIfRequired();
 		HRESULT FillLinesAndBuffer(int* linesize, byte** data, AVBufferRef** buffer);
 		AVBufferRef* AllocateBuffer(int totalSize);
-		static int get_buffer2(AVCodecContext *avCodecContext, AVFrame *frame, int flags);
 
 		AVBufferPool *m_pBufferPool;
 		AVPixelFormat m_OutputPixelFormat;
@@ -59,7 +58,6 @@ namespace FFmpegInterop
 		bool m_interlaced_frame;
 		bool m_top_field_first;
 		AVChromaLocation m_chroma_location;
-		bool m_bUseScaler;
 
 		AVBufferRef* m_VideoBufferReference = nullptr;
 		IBuffer^ m_VideoBufferObject = nullptr;
