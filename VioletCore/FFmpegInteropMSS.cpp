@@ -640,17 +640,15 @@ HRESULT FFmpegInteropMSS::ParseOptions(PropertySet^ ffmpegOptions)
 	// options can be found in https://www.ffmpeg.org/ffmpeg-protocols.html
 	if (ffmpegOptions != nullptr)
 	{
-		auto options = ffmpegOptions->First();
-
-		while (options->HasCurrent)
+		for (auto option = ffmpegOptions->First(); option->HasCurrent; option->MoveNext())
 		{
-			String^ key = options->Current->Key;
+			String^ key = option->Current->Key;
 			std::wstring keyW(key->Begin());
 			std::string keyA(keyW.begin(), keyW.end());
 			const char* keyChar = keyA.c_str();
 
 			// Convert value from Object^ to const char*. avformat_open_input will internally convert value from const char* to the correct type
-			String^ value = options->Current->Value->ToString();
+			String^ value = option->Current->Value->ToString();
 			std::wstring valueW(value->Begin());
 			std::string valueA(valueW.begin(), valueW.end());
 			const char* valueChar = valueA.c_str();
@@ -661,8 +659,6 @@ HRESULT FFmpegInteropMSS::ParseOptions(PropertySet^ ffmpegOptions)
 				hr = E_INVALIDARG;
 				break;
 			}
-
-			options->MoveNext();
 		}
 	}
 

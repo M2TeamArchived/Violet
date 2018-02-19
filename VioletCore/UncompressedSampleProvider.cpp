@@ -22,8 +22,8 @@
 using namespace FFmpegInterop;
 
 UncompressedSampleProvider::UncompressedSampleProvider(
-	FFmpegReader^ reader, 
-	AVFormatContext* avFormatCtx, 
+	FFmpegReader^ reader,
+	AVFormatContext* avFormatCtx,
 	AVCodecContext* avCodecCtx,
 	FFmpegInteropConfig^ config,
 	int streamIndex)
@@ -135,15 +135,11 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 {
 	HRESULT hr = S_OK;
 
-	AVPacket avPacket;
-	av_init_packet(&avPacket);
-	avPacket.data = NULL;
-	avPacket.size = 0;
-
+	AVPacket* avPacket = NULL;
 	LONGLONG pts = 0;
 	LONGLONG dur = 0;
 
-	hr = GetNextPacket(avPacket, pts, dur);
+	hr = GetNextPacket(&avPacket, pts, dur);
 	if (hr == S_FALSE)
 	{
 		// End of stream reached. Feed NULL packet to decoder to enter draining mode.
@@ -162,7 +158,7 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 	else if (SUCCEEDED(hr))
 	{
 		// Feed packet to decoder.
-		int sendPacketResult = avcodec_send_packet(m_pAvCodecCtx, &avPacket);
+		int sendPacketResult = avcodec_send_packet(m_pAvCodecCtx, avPacket);
 		if (sendPacketResult == AVERROR(EAGAIN))
 		{
 			// The decoder should have been drained and always ready to access input
@@ -178,7 +174,6 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 
 		// store first packet pts as nextFramePts, in case frames do not carry correct pts values 
 
-
 		if (SUCCEEDED(hr) && !hasNextFramePts)
 		{
 			nextFramePts = pts;
@@ -186,7 +181,10 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 		}
 	}
 
-	av_packet_unref(&avPacket);
+	if (avPacket)
+	{
+		av_packet_free(&avPacket);
+	}
 
 	return hr;
 }
@@ -194,7 +192,7 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 void FFmpegInterop::UncompressedSampleProvider::Flush()
 {
 	MediaSampleProvider::Flush();
-	
+
 	// after seek we need to get first packet pts again
 	hasNextFramePts = false;
 }

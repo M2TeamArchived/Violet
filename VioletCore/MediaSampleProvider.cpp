@@ -41,21 +41,18 @@ MediaSampleProvider::MediaSampleProvider(
 
 	if (m_pAvFormatCtx->start_time != 0)
 	{
-		auto streamStartTime = (long long)(av_q2d(this->m_pAvStream->time_base) * this->m_pAvStream->start_time * 1000000);
+		auto streamStartTime = (long long)(av_q2d(m_pAvFormatCtx->streams[m_streamIndex]->time_base) * m_pAvFormatCtx->streams[m_streamIndex]->start_time * 1000000);
 
 		if (m_pAvFormatCtx->start_time == streamStartTime)
 		{
 			// calculate more precise start time
-			m_startOffset = (long long)(av_q2d(this->m_pAvStream->time_base) * this->m_pAvStream->start_time * 10000000);
+			m_startOffset = (long long)(av_q2d(m_pAvFormatCtx->streams[m_streamIndex]->time_base) * m_pAvFormatCtx->streams[m_streamIndex]->start_time * 10000000);
 		}
 		else
 		{
 			m_startOffset = m_pAvFormatCtx->start_time * 10;
 		}
 	}
-
-	// init first packet pts time from start_time 
-	m_nextPacketPts = m_pAvFormatCtx->streams[m_streamIndex]->start_time;
 }
 
 HRESULT MediaSampleProvider::AllocateResources()
@@ -112,7 +109,7 @@ MediaStreamSample^ MediaSampleProvider::GetNextSample()
 	return sample;
 }
 
-HRESULT MediaSampleProvider::GetNextPacket(AVPacket& avPacket, LONGLONG & packetPts, LONGLONG & packetDuration)
+HRESULT MediaSampleProvider::GetNextPacket(AVPacket** avPacket, LONGLONG & packetPts, LONGLONG & packetDuration)
 {
 	HRESULT hr = S_OK;
 
@@ -129,12 +126,13 @@ HRESULT MediaSampleProvider::GetNextPacket(AVPacket& avPacket, LONGLONG & packet
 	if (!m_packetQueue.empty())
 	{
 		// read next packet and set pts values
-		PopPacket(avPacket);
+		auto packet = PopPacket();
+		*avPacket = packet;
 
-		packetDuration = avPacket.duration;
-		if (avPacket.pts != AV_NOPTS_VALUE)
+		packetDuration = packet->duration;
+		if (packet->pts != AV_NOPTS_VALUE)
 		{
-			packetPts = avPacket.pts;
+			packetPts = packet->pts;
 			// Set the PTS for the next sample if it doesn't one.
 			m_nextPacketPts = packetPts + packetDuration;
 		}
@@ -154,7 +152,7 @@ HRESULT MediaSampleProvider::GetNextPacket(AVPacket& avPacket, LONGLONG & packet
 }
 
 
-void MediaSampleProvider::QueuePacket(AVPacket& packet)
+void MediaSampleProvider::QueuePacket(AVPacket *packet)
 {
 	DebugMessage(L" - QueuePacket\n");
 
@@ -164,19 +162,22 @@ void MediaSampleProvider::QueuePacket(AVPacket& packet)
 	}
 	else
 	{
-		av_packet_unref(&packet);
+		av_packet_free(&packet);
 	}
 }
 
-void MediaSampleProvider::PopPacket(AVPacket& packet)
+AVPacket* MediaSampleProvider::PopPacket()
 {
 	DebugMessage(L" - PopPacket\n");
+	AVPacket* result = NULL;
 
 	if (!m_packetQueue.empty())
 	{
-		packet = m_packetQueue.front();
+		result = m_packetQueue.front();
 		m_packetQueue.pop();
 	}
+
+	return result;
 }
 
 void MediaSampleProvider::Flush()
@@ -184,9 +185,8 @@ void MediaSampleProvider::Flush()
 	DebugMessage(L"Flush\n");
 	while (!m_packetQueue.empty())
 	{
-		AVPacket avPacket;
-		PopPacket(avPacket);
-		av_packet_unref(&avPacket);
+		AVPacket *avPacket = PopPacket();
+		av_packet_free(&avPacket);
 	}
 	m_isDiscontinuous = true;
 	m_isEnabled = true;
