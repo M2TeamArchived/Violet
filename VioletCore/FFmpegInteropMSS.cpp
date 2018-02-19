@@ -354,7 +354,6 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 						hr = CreateAudioStreamDescriptor();
 						if (SUCCEEDED(hr))
 						{
-							hr = audioSampleProvider->AllocateResources();
 							if (SUCCEEDED(hr))
 							{
 								m_pReader->SetAudioStream(audioStreamIndex, audioSampleProvider);
@@ -388,16 +387,6 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 			}
 			else
 			{
-				AVDictionaryEntry *rotate_tag = av_dict_get(avFormatCtx->streams[videoStreamIndex]->metadata, "rotate", NULL, 0);
-				if (rotate_tag != NULL)
-				{
-					rotateVideo = true;
-					rotationAngle = atoi(rotate_tag->value);
-				}
-				else
-				{
-					rotateVideo = false;
-				}
 				// allocate a new decoding context
 				avVideoCodecCtx = avcodec_alloc_context3(avVideoCodec);
 				if (!avVideoCodecCtx)
@@ -441,7 +430,6 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 						hr = CreateVideoStreamDescriptor();
 						if (SUCCEEDED(hr))
 						{
-							hr = videoSampleProvider->AllocateResources();
 							if (SUCCEEDED(hr))
 							{
 								m_pReader->SetVideoStream(videoStreamIndex, videoSampleProvider);
@@ -548,88 +536,48 @@ HRESULT FFmpegInteropMSS::ConvertCodecName(const char* codecName, String^ *outpu
 
 HRESULT FFmpegInteropMSS::CreateAudioStreamDescriptor()
 {
-	auto channels = avAudioCodecCtx->profile == FF_PROFILE_AAC_HE_V2 && avAudioCodecCtx->channels == 1 ? 2 : avAudioCodecCtx->channels;
-
-	// We try to preserve source format
-	if (avAudioCodecCtx->sample_fmt == AV_SAMPLE_FMT_S32 || avAudioCodecCtx->sample_fmt == AV_SAMPLE_FMT_S32P)
-	{
-		audioStreamDescriptor = ref new AudioStreamDescriptor(AudioEncodingProperties::CreatePcm(avAudioCodecCtx->sample_rate, channels, 32));
-	}
-	else if (avAudioCodecCtx->sample_fmt == AV_SAMPLE_FMT_FLT || avAudioCodecCtx->sample_fmt == AV_SAMPLE_FMT_FLTP)
-	{
-		auto properties = ref new AudioEncodingProperties();
-		properties->Subtype = MediaEncodingSubtypes::Float;
-		properties->BitsPerSample = 32;
-		properties->SampleRate = avAudioCodecCtx->sample_rate;
-		properties->ChannelCount = channels;
-		properties->Bitrate = properties->BitsPerSample * properties->SampleRate * channels;
-		audioStreamDescriptor = ref new AudioStreamDescriptor(properties);
-	}
-	else
-	{
-		// Use S16 for all other cases
-		audioStreamDescriptor = ref new AudioStreamDescriptor(AudioEncodingProperties::CreatePcm(avAudioCodecCtx->sample_rate, channels, 16));
-	}
 	audioSampleProvider = ref new UncompressedAudioSampleProvider(m_pReader, avFormatCtx, avAudioCodecCtx, config, audioStreamIndex);
+	auto hr = audioSampleProvider->Initialize();
 
-	return (audioStreamDescriptor != nullptr && audioSampleProvider != nullptr) ? S_OK : E_OUTOFMEMORY;
+	if (SUCCEEDED(hr))
+	{
+		audioStreamDescriptor = dynamic_cast<AudioStreamDescriptor^>(audioSampleProvider->StreamDescriptor);
+
+		if (audioStreamDescriptor == nullptr)
+		{
+			hr = E_FAIL;
+		}
+	}
+
+	if (FAILED(hr))
+	{
+		audioSampleProvider = nullptr;
+	}
+
+	return hr;
 }
 
 HRESULT FFmpegInteropMSS::CreateVideoStreamDescriptor()
 {
-	VideoEncodingProperties^ videoProperties;
+	videoSampleProvider = ref new UncompressedVideoSampleProvider(m_pReader, avFormatCtx, avVideoCodecCtx, config, videoStreamIndex);
+	auto hr = videoSampleProvider->Initialize();
 
-	auto sampleProvider = ref new UncompressedVideoSampleProvider(m_pReader, avFormatCtx, avVideoCodecCtx, config, videoStreamIndex);
-	videoProperties = VideoEncodingProperties::CreateUncompressed(sampleProvider->OutputMediaSubtype, sampleProvider->DecoderWidth, sampleProvider->DecoderHeight);
-	videoSampleProvider = sampleProvider;
-
-	if (sampleProvider->DecoderWidth != avVideoCodecCtx->width || sampleProvider->DecoderHeight != avVideoCodecCtx->height)
+	if (SUCCEEDED(hr))
 	{
-		MFVideoArea area;
-		area.Area.cx = avVideoCodecCtx->width;
-		area.Area.cy = avVideoCodecCtx->height;
-		area.OffsetX.fract = 0;
-		area.OffsetX.value = 0;
-		area.OffsetY.fract = 0;
-		area.OffsetY.value = 0;
-		videoProperties->Properties->Insert(MF_MT_MINIMUM_DISPLAY_APERTURE, ref new Array<uint8_t>((byte*)&area, sizeof(MFVideoArea)));
+		videoStreamDescriptor = dynamic_cast<VideoStreamDescriptor^>(videoSampleProvider->StreamDescriptor);
+
+		if (videoStreamDescriptor == nullptr)
+		{
+			hr = E_FAIL;
+		}
 	}
 
-	if (avVideoCodecCtx->sample_aspect_ratio.num > 0 && avVideoCodecCtx->sample_aspect_ratio.den != 0)
+	if (FAILED(hr))
 	{
-		videoProperties->PixelAspectRatio->Numerator = avVideoCodecCtx->sample_aspect_ratio.num;
-		videoProperties->PixelAspectRatio->Denominator = avVideoCodecCtx->sample_aspect_ratio.den;
+		videoSampleProvider = nullptr;
 	}
 
-	if (sampleProvider->GetOutputPixelFormat() == AV_PIX_FMT_YUVJ420P)
-	{
-		// YUVJ420P uses full range values
-		videoProperties->Properties->Insert(MF_MT_VIDEO_NOMINAL_RANGE, (uint32)MFNominalRange_0_255);
-	}
-
-	videoProperties->Properties->Insert(MF_MT_INTERLACE_MODE, (uint32)_MFVideoInterlaceMode::MFVideoInterlace_MixedInterlaceOrProgressive);
-
-	if (rotateVideo)
-	{
-		Platform::Guid MF_MT_VIDEO_ROTATION(0xC380465D, 0x2271, 0x428C, 0x9B, 0x83, 0xEC, 0xEA, 0x3B, 0x4A, 0x85, 0xC1);
-		videoProperties->Properties->Insert(MF_MT_VIDEO_ROTATION, (uint32)rotationAngle);
-	}
-	// Detect the correct framerate
-	if (avVideoCodecCtx->framerate.num != 0 || avVideoCodecCtx->framerate.den != 1)
-	{
-		videoProperties->FrameRate->Numerator = avVideoCodecCtx->framerate.num;
-		videoProperties->FrameRate->Denominator = avVideoCodecCtx->framerate.den;
-	}
-	else if (avFormatCtx->streams[videoStreamIndex]->avg_frame_rate.num != 0 || avFormatCtx->streams[videoStreamIndex]->avg_frame_rate.den != 0)
-	{
-		videoProperties->FrameRate->Numerator = avFormatCtx->streams[videoStreamIndex]->avg_frame_rate.num;
-		videoProperties->FrameRate->Denominator = avFormatCtx->streams[videoStreamIndex]->avg_frame_rate.den;
-	}
-
-	videoProperties->Bitrate = (unsigned int)avVideoCodecCtx->bit_rate;
-	videoStreamDescriptor = ref new VideoStreamDescriptor(videoProperties);
-
-	return (videoStreamDescriptor != nullptr && videoSampleProvider != nullptr) ? S_OK : E_OUTOFMEMORY;
+	return hr;
 }
 
 HRESULT FFmpegInteropMSS::ParseOptions(PropertySet^ ffmpegOptions)

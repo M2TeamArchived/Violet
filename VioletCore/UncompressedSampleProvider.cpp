@@ -173,7 +173,6 @@ HRESULT UncompressedSampleProvider::FeedPacketToDecoder()
 		}
 
 		// store first packet pts as nextFramePts, in case frames do not carry correct pts values 
-
 		if (SUCCEEDED(hr) && !hasNextFramePts)
 		{
 			nextFramePts = pts;

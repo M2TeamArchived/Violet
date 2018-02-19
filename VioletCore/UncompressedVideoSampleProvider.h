@@ -43,11 +43,13 @@ namespace FFmpegInterop
 			AVCodecContext* avCodecCtx,
 			FFmpegInteropConfig^ config, 
 			int streamIndex);
+		IMediaStreamDescriptor^ CreateStreamDescriptor() override;
 		virtual HRESULT CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration) override;
 		virtual HRESULT SetSampleProperties(MediaStreamSample^ sample) override;
 		AVPixelFormat GetOutputPixelFormat() { return m_OutputPixelFormat; }
 
 	private:
+		void SelectOutputFormat();
 		HRESULT InitializeScalerIfRequired();
 		
 		AVPixelFormat m_OutputPixelFormat;

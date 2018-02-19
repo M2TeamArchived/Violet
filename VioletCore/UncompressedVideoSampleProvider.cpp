@@ -43,16 +43,61 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 		this->m_VideoBufferLineSize[i] = 0;
 		this->m_VideoBufferData[i] = nullptr;
 	}
+}
 
+IMediaStreamDescriptor^ UncompressedVideoSampleProvider::CreateStreamDescriptor()
+{
+	SelectOutputFormat();
+
+	VideoEncodingProperties^ videoProperties = 
+		VideoEncodingProperties::CreateUncompressed(
+			OutputMediaSubtype, DecoderWidth, DecoderHeight);
+
+	SetCommonVideoEncodingProperties(videoProperties);
+
+	if (DecoderWidth != m_pAvCodecCtx->width || DecoderHeight != m_pAvCodecCtx->height)
+	{
+		MFVideoArea area;
+		area.Area.cx = m_pAvCodecCtx->width;
+		area.Area.cy = m_pAvCodecCtx->height;
+		area.OffsetX.fract = 0;
+		area.OffsetX.value = 0;
+		area.OffsetY.fract = 0;
+		area.OffsetY.value = 0;
+		videoProperties->Properties->Insert(
+			Guid(MF_MT_MINIMUM_DISPLAY_APERTURE),
+			ArrayReference<byte>(reinterpret_cast<byte*>(&area), sizeof(MFVideoArea)));
+	}
+
+	if (m_pAvCodecCtx->sample_aspect_ratio.num > 0 && m_pAvCodecCtx->sample_aspect_ratio.den != 0)
+	{
+		videoProperties->PixelAspectRatio->Numerator = m_pAvCodecCtx->sample_aspect_ratio.num;
+		videoProperties->PixelAspectRatio->Denominator = m_pAvCodecCtx->sample_aspect_ratio.den;
+	}
+
+	if (m_OutputPixelFormat == AV_PIX_FMT_YUVJ420P)
+	{
+		// YUVJ420P uses full range values
+		videoProperties->Properties->Insert(
+			Guid(MF_MT_VIDEO_NOMINAL_RANGE),
+			ref new Box<uint32>(MFNominalRange_0_255));
+	}
+
+	videoProperties->Properties->Insert(
+		Guid(MF_MT_INTERLACE_MODE),
+		ref new Box<uint32>(_MFVideoInterlaceMode::MFVideoInterlace_MixedInterlaceOrProgressive));
+
+	return ref new VideoStreamDescriptor(videoProperties);
+}
+
+void UncompressedVideoSampleProvider::SelectOutputFormat()
+{
 	// We use NV12 format, NV12 is generally the preferred format.
 	m_OutputPixelFormat = AV_PIX_FMT_NV12;
 	OutputMediaSubtype = MediaEncodingSubtypes::Nv12;
 
-	auto width = avCodecCtx->width;
-	auto height = avCodecCtx->height;
-
-	DecoderWidth = width;
-	DecoderHeight = height;
+	DecoderWidth = m_pAvCodecCtx->width;
+	DecoderHeight = m_pAvCodecCtx->height;
 }
 
 HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()

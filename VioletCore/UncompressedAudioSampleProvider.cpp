@@ -39,23 +39,11 @@ UncompressedAudioSampleProvider::UncompressedAudioSampleProvider(
 {
 }
 
-HRESULT UncompressedAudioSampleProvider::AllocateResources()
+HRESULT UncompressedAudioSampleProvider::InitializeResamplerIfRequired()
 {
 	HRESULT hr = S_OK;
-
-	hr = UncompressedSampleProvider::AllocateResources();
-	if (SUCCEEDED(hr))
+	if (!m_pSwrCtx)
 	{
-		inChannels = outChannels = m_pAvCodecCtx->profile == FF_PROFILE_AAC_HE_V2 && m_pAvCodecCtx->channels == 1 ? 2 : m_pAvCodecCtx->channels;
-		inChannelLayout = m_pAvCodecCtx->channel_layout && (m_pAvCodecCtx->profile != FF_PROFILE_AAC_HE_V2 || m_pAvCodecCtx->channels > 1) ? m_pAvCodecCtx->channel_layout : av_get_default_channel_layout(inChannels);
-		outChannelLayout = av_get_default_channel_layout(outChannels);
-		inSampleRate = outSampleRate = m_pAvCodecCtx->sample_rate;
-		inSampleFormat = m_pAvCodecCtx->sample_fmt;
-		outSampleFormat =
-			(inSampleFormat == AV_SAMPLE_FMT_S32 || inSampleFormat == AV_SAMPLE_FMT_S32P) ? AV_SAMPLE_FMT_S32 :
-			(inSampleFormat == AV_SAMPLE_FMT_FLT || inSampleFormat == AV_SAMPLE_FMT_FLTP) ? AV_SAMPLE_FMT_FLT :
-			AV_SAMPLE_FMT_S16;
-	
 		// Set up resampler to convert to output format and channel layout.
 		m_pSwrCtx = swr_alloc_set_opts(
 			NULL,
@@ -98,22 +86,27 @@ UncompressedAudioSampleProvider::~UncompressedAudioSampleProvider()
 HRESULT UncompressedAudioSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration)
 {
 	HRESULT hr = S_OK;
+
+	hr = InitializeResamplerIfRequired();
+
+	if (SUCCEEDED(hr))
+	{
+		// Resample uncompressed frame to output format
+		uint8_t **resampledData = nullptr;
+		unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, outChannels, avFrame->nb_samples, outSampleFormat, 0);
+		int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
+
+		if (resampledDataSize < 0)
+		{
+			hr = E_FAIL;
+		}
+		else
+		{
+			auto size = min(aBufferSize, (unsigned int)(resampledDataSize * outChannels * av_get_bytes_per_sample(outSampleFormat)));
+			*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
+		}
+	}
 	
-	// Resample uncompressed frame to output format
-	uint8_t **resampledData = nullptr;
-	unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, outChannels, avFrame->nb_samples, outSampleFormat, 0);
-	int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
-
-	if (resampledDataSize < 0)
-	{
-		hr = E_FAIL;
-	}
-	else
-	{
-		auto size = min(aBufferSize, (unsigned int)(resampledDataSize * outChannels * av_get_bytes_per_sample(outSampleFormat)));
-		*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
-	}
-
 	if (SUCCEEDED(hr))
 	{
 		// always update duration with real decoded sample duration
@@ -136,5 +129,39 @@ HRESULT UncompressedAudioSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 	}
 
 	return hr;
+}
+
+IMediaStreamDescriptor ^ FFmpegInterop::UncompressedAudioSampleProvider::CreateStreamDescriptor()
+{
+	inChannels = outChannels = m_pAvCodecCtx->profile == FF_PROFILE_AAC_HE_V2 && m_pAvCodecCtx->channels == 1 ? 2 : m_pAvCodecCtx->channels;
+	inChannelLayout = m_pAvCodecCtx->channel_layout && (m_pAvCodecCtx->profile != FF_PROFILE_AAC_HE_V2 || m_pAvCodecCtx->channels > 1) ? m_pAvCodecCtx->channel_layout : av_get_default_channel_layout(inChannels);
+	outChannelLayout = av_get_default_channel_layout(outChannels);
+	inSampleRate = outSampleRate = m_pAvCodecCtx->sample_rate;
+	inSampleFormat = m_pAvCodecCtx->sample_fmt;
+	outSampleFormat =
+		(inSampleFormat == AV_SAMPLE_FMT_S32 || inSampleFormat == AV_SAMPLE_FMT_S32P) ? AV_SAMPLE_FMT_S32 :
+		(inSampleFormat == AV_SAMPLE_FMT_FLT || inSampleFormat == AV_SAMPLE_FMT_FLTP) ? AV_SAMPLE_FMT_FLT :
+		AV_SAMPLE_FMT_S16;
+
+	// We try to preserve source format
+	if (outSampleFormat == AV_SAMPLE_FMT_S32)
+	{
+		return ref new AudioStreamDescriptor(AudioEncodingProperties::CreatePcm(outSampleRate, outChannels, 32));
+	}
+	else if (outSampleFormat == AV_SAMPLE_FMT_FLT)
+	{
+		auto properties = ref new AudioEncodingProperties();
+		properties->Subtype = MediaEncodingSubtypes::Float;
+		properties->BitsPerSample = 32;
+		properties->SampleRate = outSampleRate;
+		properties->ChannelCount = outChannels;
+		properties->Bitrate = properties->BitsPerSample * properties->SampleRate * outChannels;
+		return ref new AudioStreamDescriptor(properties);
+	}
+	else
+	{
+		// Use S16 for all other cases
+		return ref new AudioStreamDescriptor(AudioEncodingProperties::CreatePcm(outSampleRate, outChannels, 16));
+	}
 }
 

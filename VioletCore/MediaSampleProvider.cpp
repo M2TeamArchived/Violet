@@ -55,10 +55,11 @@ MediaSampleProvider::MediaSampleProvider(
 	}
 }
 
-HRESULT MediaSampleProvider::AllocateResources()
+HRESULT FFmpegInterop::MediaSampleProvider::Initialize()
 {
-	DebugMessage(L"AllocateResources\n");
-	return S_OK;
+	this->m_streamDescriptor = this->CreateStreamDescriptor();
+
+	return this->m_streamDescriptor ? S_OK : E_FAIL;
 }
 
 MediaSampleProvider::~MediaSampleProvider()
@@ -197,6 +198,31 @@ void MediaSampleProvider::DisableStream()
 	DebugMessage(L"DisableStream\n");
 	Flush();
 	m_isEnabled = false;
+}
+
+void MediaSampleProvider::SetCommonVideoEncodingProperties(VideoEncodingProperties^ videoEncodingProperties)
+{
+	AVDictionaryEntry *rotate_tag = av_dict_get(m_pAvStream->metadata, "rotate", nullptr, 0);
+	if (nullptr != rotate_tag)
+	{
+		videoEncodingProperties->Properties->Insert(
+			Guid(MF_MT_VIDEO_ROTATION),
+			ref new Box<uint32>(atoi(rotate_tag->value)));
+	}
+
+	// Detect the correct framerate
+	if (m_pAvCodecCtx->framerate.num != 0 || m_pAvCodecCtx->framerate.den != 1)
+	{
+		videoEncodingProperties->FrameRate->Numerator = m_pAvCodecCtx->framerate.num;
+		videoEncodingProperties->FrameRate->Denominator = m_pAvCodecCtx->framerate.den;
+	}
+	else if (m_pAvStream->avg_frame_rate.num != 0 || m_pAvStream->avg_frame_rate.den != 0)
+	{
+		videoEncodingProperties->FrameRate->Numerator = m_pAvStream->avg_frame_rate.num;
+		videoEncodingProperties->FrameRate->Denominator = m_pAvStream->avg_frame_rate.den;
+	}
+
+	videoEncodingProperties->Bitrate = static_cast<unsigned int>(m_pAvCodecCtx->bit_rate);
 }
 
 void free_buffer(void *lpVoid)

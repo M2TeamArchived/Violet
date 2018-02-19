@@ -118,8 +118,6 @@ namespace FFmpegInterop
 		int audioStreamIndex;
 		int videoStreamIndex;
 		
-		bool rotateVideo;
-		int rotationAngle;
 		std::recursive_mutex mutexGuard;
 		
 		MediaSampleProvider^ audioSampleProvider;
