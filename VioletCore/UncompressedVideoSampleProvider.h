@@ -49,17 +49,13 @@ namespace FFmpegInterop
 
 	private:
 		HRESULT InitializeScalerIfRequired();
-		HRESULT FillLinesAndBuffer(int* linesize, byte** data, AVBufferRef** buffer);
-		AVBufferRef* AllocateBuffer(int totalSize);
-
-		AVBufferPool *m_pBufferPool;
+		
 		AVPixelFormat m_OutputPixelFormat;
 		SwsContext* m_pSwsCtx;
 		bool m_interlaced_frame;
 		bool m_top_field_first;
 		AVChromaLocation m_chroma_location;
 
-		AVBufferRef* m_VideoBufferReference = nullptr;
 		IBuffer^ m_VideoBufferObject = nullptr;
 
 		int m_VideoBufferLineSize[4];

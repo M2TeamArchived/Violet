@@ -80,10 +80,24 @@ HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()
 			hr = E_OUTOFMEMORY;
 		}
 
-		// Using scaler: allocate a new frame from buffer pool
-		hr = FillLinesAndBuffer(this->m_VideoBufferLineSize, this->m_VideoBufferData, &this->m_VideoBufferReference);
+		// Allocate a frame for output.
+		if (av_image_alloc(
+			this->m_VideoBufferData,
+			this->m_VideoBufferLineSize,
+			DecoderWidth,
+			DecoderHeight,
+			m_OutputPixelFormat,
+			1) < 0)
+		{
+			hr = E_FAIL;
+		}
 
-		this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBufferReference->data, this->m_VideoBufferReference->size);
+		int YBufferSize = this->m_VideoBufferLineSize[0] * DecoderHeight;
+		int UBufferSize = this->m_VideoBufferLineSize[1] * DecoderHeight / 2;
+		int VBufferSize = this->m_VideoBufferLineSize[2] * DecoderHeight / 2;
+		int YUVBufferSize = YBufferSize + UBufferSize + VBufferSize;
+		
+		this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBufferData[0], YUVBufferSize);
 	}
 
 	return hr;
@@ -96,14 +110,9 @@ UncompressedVideoSampleProvider::~UncompressedVideoSampleProvider()
 		sws_freeContext(m_pSwsCtx);
 	}
 
-	if (m_pBufferPool)
+	if (nullptr != this->m_VideoBufferData)
 	{
-		av_buffer_pool_uninit(&m_pBufferPool);
-	}
-
-	if (nullptr != this->m_VideoBufferReference)
-	{
-		free_buffer(this->m_VideoBufferReference);
+		av_freep(this->m_VideoBufferData);
 	}
 }
 
@@ -116,13 +125,20 @@ HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 	if (SUCCEEDED(hr))
 	{
 		// Convert to output format using FFmpeg software scaler
-		if (sws_scale(m_pSwsCtx, (const uint8_t **)(avFrame->data), avFrame->linesize, 0, m_pAvCodecCtx->height, this->m_VideoBufferData, this->m_VideoBufferLineSize) > 0)
+		if (sws_scale(
+			m_pSwsCtx,
+			(const uint8_t **)(avFrame->data), 
+			avFrame->linesize,
+			0,
+			m_pAvCodecCtx->height,
+			this->m_VideoBufferData,
+			this->m_VideoBufferLineSize) > 0)
 		{
 			*pBuffer = this->m_VideoBufferObject;
 		}
 		else
 		{
-			free_buffer(this->m_VideoBufferReference);
+			av_freep(this->m_VideoBufferData);
 			hr = E_FAIL;
 		}
 	}
@@ -140,108 +156,54 @@ HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 	return hr;
 }
 
-Guid g_MFMTVideoChromaSiting(MF_MT_VIDEO_CHROMA_SITING);
-
-IBox<uint32>^ g_MFVideoChromaSubsampling_MPEG2 = ref new Box<uint32>(MFVideoChromaSubsampling_MPEG2);
-IBox<uint32>^ g_MFVideoChromaSubsampling_MPEG1 = ref new Box<uint32>(MFVideoChromaSubsampling_MPEG1);
-IBox<uint32>^ g_MFVideoChromaSubsampling_DV_PAL = ref new Box<uint32>(MFVideoChromaSubsampling_DV_PAL);
-IBox<uint32>^ g_MFVideoChromaSubsampling_Cosited = ref new Box<uint32>(MFVideoChromaSubsampling_Cosited);
-
-IBox<int>^ g_TrueValue = ref new Box<int>(TRUE);
-IBox<int>^ g_FalseValue = ref new Box<int>(FALSE);
-
-Guid g_MFSampleExtension_Interlaced(MFSampleExtension_Interlaced);
-Guid g_MFSampleExtension_BottomFieldFirst(MFSampleExtension_BottomFieldFirst);
-Guid g_MFSampleExtension_RepeatFirstField(MFSampleExtension_RepeatFirstField);
-
 HRESULT UncompressedVideoSampleProvider::SetSampleProperties(MediaStreamSample^ sample)
 {
 	MediaStreamSamplePropertySet^ ExtendedProperties = sample->ExtendedProperties;
 	
+	ExtendedProperties->Insert(
+		Guid(MFSampleExtension_Interlaced), 
+		ref new Box<int>(m_interlaced_frame ? TRUE : FALSE));
 	
 	if (m_interlaced_frame)
 	{
-		ExtendedProperties->Insert(g_MFSampleExtension_Interlaced, g_TrueValue);
-		ExtendedProperties->Insert(g_MFSampleExtension_BottomFieldFirst, m_top_field_first ? g_FalseValue : g_TrueValue);
-		ExtendedProperties->Insert(g_MFSampleExtension_RepeatFirstField, g_FalseValue);
+		ExtendedProperties->Insert(
+			Guid(MFSampleExtension_BottomFieldFirst), 
+			ref new Box<int>(m_top_field_first ? FALSE : TRUE));
+
+		ExtendedProperties->Insert(
+			Guid(MFSampleExtension_RepeatFirstField), 
+			ref new Box<int>(FALSE));
 	}
-	else
-	{
-		ExtendedProperties->Insert(g_MFSampleExtension_Interlaced, g_FalseValue);
-	}
+	
+	bool NeedToSetMFMTVideoChromaSiting = false;
+	MFVideoChromaSubsampling MFMTVideoChromaSitingValue;
 
 	switch (m_chroma_location)
 	{
 	case AVCHROMA_LOC_LEFT:
-		ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_MPEG2);
+		MFMTVideoChromaSitingValue = MFVideoChromaSubsampling_MPEG2;
+		NeedToSetMFMTVideoChromaSiting = true;		
 		break;
 	case AVCHROMA_LOC_CENTER:
-		ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_MPEG1);
+		MFMTVideoChromaSitingValue = MFVideoChromaSubsampling_MPEG1;
+		NeedToSetMFMTVideoChromaSiting = true;
 		break;
 	case AVCHROMA_LOC_TOPLEFT:
-		if (m_interlaced_frame)
-		{
-			ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_DV_PAL);
-		}
-		else
-		{
-			ExtendedProperties->Insert(g_MFMTVideoChromaSiting, g_MFVideoChromaSubsampling_Cosited);
-		}
+		MFMTVideoChromaSitingValue = m_interlaced_frame
+			? MFVideoChromaSubsampling_DV_PAL
+			: MFVideoChromaSubsampling_Cosited;
+		NeedToSetMFMTVideoChromaSiting = true;
 		break;
 	default:
 		break;
 	}
 
-	return S_OK;
-}
-
-HRESULT UncompressedVideoSampleProvider::FillLinesAndBuffer(int* linesize, byte** data, AVBufferRef** buffer)
-{
-	if (av_image_fill_linesizes(linesize, m_OutputPixelFormat, DecoderWidth) < 0)
+	if (NeedToSetMFMTVideoChromaSiting)
 	{
-		return E_FAIL;
+		ExtendedProperties->Insert(
+			Guid(MF_MT_VIDEO_CHROMA_SITING), 
+			ref new Box<uint32>(MFMTVideoChromaSitingValue));
 	}
-
-	auto YBufferSize = linesize[0] * DecoderHeight;
-	auto UBufferSize = linesize[1] * DecoderHeight / 2;
-	auto VBufferSize = linesize[2] * DecoderHeight / 2;
-	auto totalSize = YBufferSize + UBufferSize + VBufferSize;
-
-	buffer[0] = AllocateBuffer(totalSize);
-	if (!buffer[0])
-	{
-		return E_OUTOFMEMORY;
-	}
-
-	data[0] = buffer[0]->data;
-	data[1] = UBufferSize > 0 ? buffer[0]->data + YBufferSize : NULL;
-	data[2] = VBufferSize > 0 ? buffer[0]->data + YBufferSize + UBufferSize : NULL;
-	data[3] = NULL;
 
 	return S_OK;
-}
-
-AVBufferRef* UncompressedVideoSampleProvider::AllocateBuffer(int totalSize)
-{
-	if (!m_pBufferPool)
-	{
-		m_pBufferPool = av_buffer_pool_init(totalSize, NULL);
-		if (!m_pBufferPool)
-		{
-			return NULL;
-		}
-	}
-
-	auto buffer = av_buffer_pool_get(m_pBufferPool);
-	if (!buffer)
-	{
-		return NULL;
-	}
-	if (buffer->size != totalSize)
-	{
-		free_buffer(buffer);
-		return NULL;
-	}
-
-	return buffer;
 }
