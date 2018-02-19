@@ -117,7 +117,6 @@ namespace FFmpegInterop
 		VideoStreamDescriptor^ videoStreamDescriptor;
 		int audioStreamIndex;
 		int videoStreamIndex;
-		int thumbnailStreamIndex;
 		
 		bool rotateVideo;
 		int rotationAngle;

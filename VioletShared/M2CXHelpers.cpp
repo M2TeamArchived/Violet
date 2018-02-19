@@ -8,6 +8,16 @@ License: The MIT License
 #include "pch.h"
 
 #include <Windows.h>
+#include <wrl\client.h>
+#include <wrl\implements.h>
+#include <robuffer.h>
+#include <windows.storage.streams.h>
+
+using Microsoft::WRL::ComPtr;
+using Microsoft::WRL::MakeAndInitialize;
+using Microsoft::WRL::RuntimeClass;
+using Microsoft::WRL::RuntimeClassFlags;
+using Microsoft::WRL::RuntimeClassType;
 
 #include "M2CXHelpers.h"
 
@@ -138,4 +148,112 @@ Platform::Guid M2CreateGuid()
 	GUID guid = { 0 };
 	M2ThrowPlatformExceptionIfFailed(CoCreateGuid(&guid));
 	return Platform::Guid(guid);
+}
+
+// Retrieves the raw pointer from the provided IBuffer object. 
+// Parameters:
+//   Buffer: The IBuffer object you want to retrieve the raw pointer.
+// Return value:
+//   If the function succeeds, the return value is the raw pointer from the 
+//   provided IBuffer object. If the function fails, the return value is 
+//   nullptr.
+// Warning: 
+//   The lifetime of the returned buffer is controlled by the lifetime of the 
+//   buffer object that's passed to this method. When the buffer has been 
+//   released, the pointer becomes invalid and must not be used.
+byte* M2GetPointer(Windows::Storage::Streams::IBuffer^ Buffer)
+{
+	byte* pBuffer = nullptr;
+	ComPtr<Windows::Storage::Streams::IBufferByteAccess> bufferByteAccess;
+	if (SUCCEEDED(ComPtr<IInspectable>(M2GetInspectable(Buffer)).As(
+		&bufferByteAccess)))
+	{	
+		bufferByteAccess->Buffer(&pBuffer);
+	}
+
+	return pBuffer;
+}
+
+class BufferReference : public RuntimeClass<
+	RuntimeClassFlags<RuntimeClassType::WinRtClassicComMix>,
+	ABI::Windows::Storage::Streams::IBuffer,
+	Windows::Storage::Streams::IBufferByteAccess>
+{
+private:
+	UINT32 m_Capacity;
+	UINT32 m_Length;
+	byte* m_Pointer;
+
+public:
+	virtual ~BufferReference()
+	{
+	}
+
+	STDMETHODIMP RuntimeClassInitialize(
+		byte* Pointer, UINT32 Capacity)
+	{
+		m_Capacity = Capacity;
+		m_Length = Capacity;
+		m_Pointer = Pointer;
+		return S_OK;
+	}
+
+	// IBufferByteAccess::Buffer
+	STDMETHODIMP Buffer(byte** value)
+	{
+		*value = m_Pointer;
+		return S_OK;
+	}
+
+	// IBuffer::get_Capacity
+	STDMETHODIMP get_Capacity(UINT32* value)
+	{
+		*value = m_Capacity;
+		return S_OK;
+	}
+
+	// IBuffer::get_Length
+	STDMETHODIMP get_Length(UINT32* value)
+	{
+		*value = m_Length;
+		return S_OK;
+	}
+
+	// IBuffer::put_Length
+	STDMETHODIMP put_Length(UINT32 value)
+	{
+		if (value > m_Capacity)
+			return E_INVALIDARG;
+		m_Length = value;
+		return S_OK;
+	}
+};
+
+// Retrieves the IBuffer object from the provided raw pointer.
+// Parameters:
+//   Pointer: The raw pointer you want to retrieve the IBuffer object.
+//   Capacity: The size of raw pointer you want to retrieve the IBuffer object.
+// Return value:
+//   If the function succeeds, the return value is the IBuffer object from the 
+//   provided raw pointer. If the function fails, the return value is nullptr.
+// Warning: 
+//   The lifetime of the returned IBuffer object is controlled by the lifetime 
+//   of the raw pointer that's passed to this method. When the raw pointer has 
+//   been released, the IBuffer object becomes invalid and must not be used.
+Windows::Storage::Streams::IBuffer^ M2MakeIBuffer(
+	byte* Pointer, 
+	UINT32 Capacity)
+{
+	using Windows::Storage::Streams::IBuffer;
+
+	IBuffer^ buffer = nullptr;
+
+	ComPtr<BufferReference> bufferReference;
+	if (SUCCEEDED(MakeAndInitialize<BufferReference>(
+		&bufferReference, Pointer, Capacity)))
+	{
+		buffer = reinterpret_cast<IBuffer^>(bufferReference.Get());
+	}
+
+	return buffer;
 }

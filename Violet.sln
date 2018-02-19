@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
-VisualStudioVersion = 15.0.27130.2026
+VisualStudioVersion = 15.0.27130.2027
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documents", "Documents", "{9CAB2BCF-6F3A-4399-AF6F-6D8E078B13C1}"
 	ProjectSection(SolutionItems) = preProject
@@ -23,6 +23,7 @@ Global
 		VioletShared\VioletShared.vcxitems*{9c232a49-e228-4192-8920-c4baf938e73a}*SharedItemsImports = 9
 		ThirdParty\FFmpegUniversalSDK\FFmpegUniversalSDK.vcxitems*{b4f7b4b6-d656-4fb5-a988-c62b38a3540c}*SharedItemsImports = 9
 		ThirdParty\FFmpegUniversalSDK\FFmpegUniversalSDK.vcxitems*{f904022d-9985-4b5d-ae97-54f0cab5e791}*SharedItemsImports = 4
+		VioletShared\VioletShared.vcxitems*{f904022d-9985-4b5d-ae97-54f0cab5e791}*SharedItemsImports = 4
 	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|ARM = Debug|ARM

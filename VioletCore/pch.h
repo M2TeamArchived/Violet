@@ -42,6 +42,7 @@ extern "C"
 #pragma warning(pop)
 #endif
 
+#include "M2AsyncHelpers.h"
 
 // Disable debug string output on non-debug build
 #if !_DEBUG

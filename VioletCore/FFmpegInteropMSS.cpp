@@ -41,7 +41,6 @@ FFmpegInteropMSS::FFmpegInteropMSS(FFmpegInteropConfig^ interopConfig)
 	: config(interopConfig)
 	, audioStreamIndex(AVERROR_STREAM_NOT_FOUND)
 	, videoStreamIndex(AVERROR_STREAM_NOT_FOUND)
-	, thumbnailStreamIndex(AVERROR_STREAM_NOT_FOUND)
 	, isFirstSeek(true)
 {
 	if (!isRegistered)
@@ -384,13 +383,11 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 			// Avoid creating unnecessarily video stream from this album/cover art
 			if (avFormatCtx->streams[videoStreamIndex]->disposition == AV_DISPOSITION_ATTACHED_PIC)
 			{
-				thumbnailStreamIndex = videoStreamIndex;
 				videoStreamIndex = AVERROR_STREAM_NOT_FOUND;
 				avVideoCodec = nullptr;
 			}
 			else
 			{
-				thumbnailStreamIndex = AVERROR_STREAM_NOT_FOUND;
 				AVDictionaryEntry *rotate_tag = av_dict_get(avFormatCtx->streams[videoStreamIndex]->metadata, "rotate", NULL, 0);
 				if (rotate_tag != NULL)
 				{

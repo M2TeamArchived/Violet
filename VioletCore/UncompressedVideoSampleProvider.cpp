@@ -55,8 +55,6 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 	DecoderHeight = height;
 }
 
-#include <M2.Helpers.WinRT.h>
-
 HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()
 {
 	HRESULT hr = S_OK;

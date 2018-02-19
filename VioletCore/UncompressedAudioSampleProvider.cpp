@@ -56,46 +56,6 @@ HRESULT UncompressedAudioSampleProvider::AllocateResources()
 			(inSampleFormat == AV_SAMPLE_FMT_FLT || inSampleFormat == AV_SAMPLE_FMT_FLTP) ? AV_SAMPLE_FMT_FLT :
 			AV_SAMPLE_FMT_S16;
 	
-		needsUpdateResampler = inSampleFormat != outSampleFormat || inChannels != outChannels || inChannelLayout != outChannelLayout || inSampleRate != outSampleRate;
-	}
-
-	return hr;
-}
-
-HRESULT UncompressedAudioSampleProvider::CheckFormatChanged(AVFrame* frame)
-{
-	HRESULT hr = S_OK;
-
-	bool hasFormatChanged = frame->channels != inChannels || frame->sample_rate != inSampleRate || frame->format != inSampleFormat;
-	if (hasFormatChanged)
-	{
-		inChannels = frame->channels;
-		inChannelLayout = frame->channel_layout ? frame->channel_layout : av_get_default_channel_layout(inChannels);
-		inSampleRate = frame->sample_rate;
-		inSampleFormat = (AVSampleFormat)frame->format;
-		needsUpdateResampler = true;
-	}
-
-	if (needsUpdateResampler)
-	{
-		hr = UpdateResampler();
-	}
-
-	return hr;
-}
-
-HRESULT UncompressedAudioSampleProvider::UpdateResampler()
-{
-	HRESULT hr = S_OK;
-
-	auto needsResampler = inChannels != outChannels || inChannelLayout != outChannelLayout || inSampleRate != outSampleRate || inSampleFormat != outSampleFormat;
-	if (needsResampler)
-	{
-		if (m_pSwrCtx)
-		{
-			swr_free(&m_pSwrCtx);
-		}
-
 		// Set up resampler to convert to output format and channel layout.
 		m_pSwrCtx = swr_alloc_set_opts(
 			NULL,
@@ -122,17 +82,6 @@ HRESULT UncompressedAudioSampleProvider::UpdateResampler()
 			}
 		}
 	}
-	else
-	{
-		//dispose of it if we don't need it anymore
-		if (m_pSwrCtx)
-		{
-			swr_free(&m_pSwrCtx);
-		}
-	}
-
-	// force update next time if there was an error
-	needsUpdateResampler = FAILED(hr);
 
 	return hr;
 }
@@ -140,48 +89,29 @@ HRESULT UncompressedAudioSampleProvider::UpdateResampler()
 UncompressedAudioSampleProvider::~UncompressedAudioSampleProvider()
 {
 	// Free 
-	swr_free(&m_pSwrCtx);
+	if (m_pSwrCtx)
+	{
+		swr_free(&m_pSwrCtx);
+	}
 }
 
 HRESULT UncompressedAudioSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration)
 {
 	HRESULT hr = S_OK;
 	
-	hr = CheckFormatChanged(avFrame);
-	
-	if (SUCCEEDED(hr))
-	{
-		if (m_pSwrCtx)
-		{
-			// Resample uncompressed frame to output format
-			uint8_t **resampledData = nullptr;
-			unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, outChannels, avFrame->nb_samples, outSampleFormat, 0);
-			int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
+	// Resample uncompressed frame to output format
+	uint8_t **resampledData = nullptr;
+	unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, outChannels, avFrame->nb_samples, outSampleFormat, 0);
+	int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
 
-			if (resampledDataSize < 0)
-			{
-				hr = E_FAIL;
-			}
-			else
-			{
-				auto size = min(aBufferSize, (unsigned int)(resampledDataSize * outChannels * av_get_bytes_per_sample(outSampleFormat)));
-				*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
-			}
-		}
-		else
-		{
-			// Using direct buffer: just create a buffer reference to hand out to MSS pipeline
-			auto bufferRef = av_buffer_ref(avFrame->buf[0]);
-			if (bufferRef)
-			{
-				auto size = min(bufferRef->size, avFrame->nb_samples * outChannels * av_get_bytes_per_sample(outSampleFormat));
-				*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(bufferRef->data, size, free_buffer, bufferRef);
-			}
-			else
-			{
-				hr = E_FAIL;
-			}
-		}
+	if (resampledDataSize < 0)
+	{
+		hr = E_FAIL;
+	}
+	else
+	{
+		auto size = min(aBufferSize, (unsigned int)(resampledDataSize * outChannels * av_get_bytes_per_sample(outSampleFormat)));
+		*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
 	}
 
 	if (SUCCEEDED(hr))
