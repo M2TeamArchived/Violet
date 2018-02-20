@@ -517,21 +517,7 @@ HRESULT FFmpegInteropMSS::ConvertCodecName(const char* codecName, String^ *outpu
 	HRESULT hr = S_OK;
 
 	// Convert codec name from const char* to Platform::String
-	auto codecNameChars = codecName;
-	size_t newsize = strlen(codecNameChars) + 1;
-	wchar_t * wcstring = new(std::nothrow) wchar_t[newsize];
-	if (wcstring == nullptr)
-	{
-		hr = E_OUTOFMEMORY;
-	}
-
-	if (SUCCEEDED(hr))
-	{
-		size_t convertedChars = 0;
-		mbstowcs_s(&convertedChars, wcstring, newsize, codecNameChars, _TRUNCATE);
-		*outputCodecName = ref new Platform::String(wcstring);
-		delete[] wcstring;
-	}
+	*outputCodecName = M2MakeCXString(M2MakeUTF16String(std::string(codecName)));
 
 	return hr;
 }
@@ -590,21 +576,15 @@ HRESULT FFmpegInteropMSS::ParseOptions(PropertySet^ ffmpegOptions)
 	// options can be found in https://www.ffmpeg.org/ffmpeg-protocols.html
 	if (ffmpegOptions != nullptr)
 	{
-		for (auto option = ffmpegOptions->First(); option->HasCurrent; option->MoveNext())
+		for (auto options = ffmpegOptions->First(); options->HasCurrent; options->MoveNext())
 		{
-			String^ key = option->Current->Key;
-			std::wstring keyW(key->Begin());
-			std::string keyA(keyW.begin(), keyW.end());
-			const char* keyChar = keyA.c_str();
-
-			// Convert value from Object^ to const char*. avformat_open_input will internally convert value from const char* to the correct type
-			String^ value = option->Current->Value->ToString();
-			std::wstring valueW(value->Begin());
-			std::string valueA(valueW.begin(), valueW.end());
-			const char* valueChar = valueA.c_str();
+			auto option = options->Current;
+			
+			std::string Key = M2MakeUTF8String(option->Key);
+			std::string Value = M2MakeUTF8String(option->Value->ToString());
 
 			// Add key and value pair entry
-			if (av_dict_set(&avDict, keyChar, valueChar, 0) < 0)
+			if (av_dict_set(&avDict, Key.c_str(), Value.c_str(), 0) < 0)
 			{
 				hr = E_INVALIDARG;
 				break;

@@ -260,88 +260,22 @@ Windows::Storage::Streams::IBuffer^ M2MakeIBuffer(
 	return buffer;
 }
 
-// Converts from UTF-8 string to UTF-16 string.
-// Parameters:
-//   UTF8String: The UTF-8 string you want to convert.
-// Return value:
-//   The return value is the UTF-16 string.
-std::wstring M2MakeUTF16String(const std::string& UTF8String)
-{
-	std::wstring UTF16String;
-
-	int UTF16StringLength = MultiByteToWideChar(
-		CP_UTF8,
-		0,
-		UTF8String.data(),
-		(int)UTF8String.size(),
-		nullptr,
-		0);
-	if (UTF16StringLength > 0)
-	{
-		UTF16String.resize(UTF16StringLength);
-		MultiByteToWideChar(
-			CP_UTF8,
-			0,
-			UTF8String.data(),
-			(int)UTF8String.size(),
-			&UTF16String[0],
-			UTF16StringLength);
-	}
-
-	return UTF16String;
-}
-
-// Converts from UTF-16 string to UTF-8 string.
-// Parameters:
-//   UTF16String: The UTF-16 string you want to convert.
-// Return value:
-//   The return value is the UTF-8 string.
-std::string M2MakeUTF8String(const std::wstring& UTF16String)
-{
-	std::string UTF8String;
-
-	int UTF8StringLength = WideCharToMultiByte(
-		CP_UTF8,
-		0,
-		UTF16String.data(),
-		(int)UTF16String.size(),
-		nullptr,
-		0,
-		nullptr,
-		nullptr);
-	if (UTF8StringLength > 0)
-	{
-		UTF8String.resize(UTF8StringLength);
-		WideCharToMultiByte(
-			CP_UTF8,
-			0,
-			UTF16String.data(),
-			(int)UTF16String.size(),
-			&UTF8String[0],
-			UTF8StringLength,
-			nullptr,
-			nullptr);
-	}
-
-	return UTF8String;
-}
-
-// Converts from C++/CX string to UTF-16 string.
+// Converts from the C++/CX string to the UTF-16 string.
 // Parameters:
 //   PlatformString: The C++/CX string you want to convert.
 // Return value:
 //   The return value is the UTF-16 string.
-std::wstring M2MakeUTF16String(Platform::String^& PlatformString)
+std::wstring M2MakeUTF16String(Platform::String^ PlatformString)
 {
 	return std::wstring(PlatformString->Data(), PlatformString->Length());
 }
 
-// Converts from C++/CX string to UTF-8 string.
+// Converts from the C++/CX string to the UTF-8 string.
 // Parameters:
 //   PlatformString: The C++/CX string you want to convert.
 // Return value:
 //   The return value is the UTF-8 string.
-std::string M2MakeUTF8String(Platform::String^& PlatformString)
+std::string M2MakeUTF8String(Platform::String^ PlatformString)
 {
 	std::string UTF8String;
 
@@ -369,4 +303,14 @@ std::string M2MakeUTF8String(Platform::String^& PlatformString)
 	}
 
 	return UTF8String;
+}
+
+// Converts from the UTF-8 string to the C++/CX string.
+// Parameters:
+//   UTF16String: The UTF-16 string you want to convert.
+// Return value:
+//   The return value is the C++/CX string.
+Platform::String^ M2MakeCXString(const std::wstring& UTF16String)
+{
+	return ref new Platform::String(UTF16String.c_str(), UTF16String.size());
 }
