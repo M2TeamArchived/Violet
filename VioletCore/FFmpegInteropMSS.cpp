@@ -166,7 +166,7 @@ HRESULT FFmpegInteropMSS::CreateMediaStreamSource(String^ uri)
 	return hr;
 }
 
-HRESULT FFmpegInteropMSS::CreateMediaStreamSource(IRandomAccessStream^ stream, MediaStreamSource^ mss)
+HRESULT FFmpegInteropMSS::CreateMediaStreamSource(IRandomAccessStream^ stream, MediaStreamSource^ MSS)
 {
 	HRESULT hr = S_OK;
 	if (!stream)
@@ -238,7 +238,7 @@ HRESULT FFmpegInteropMSS::CreateMediaStreamSource(IRandomAccessStream^ stream, M
 
 	if (SUCCEEDED(hr))
 	{
-		this->mss = mss;
+		this->mss = MSS;
 		hr = InitFFmpegContext();
 	}
 
@@ -253,6 +253,8 @@ static int is_hwaccel_pix_fmt(enum AVPixelFormat pix_fmt)
 
 static AVPixelFormat get_format(struct AVCodecContext *s, const enum AVPixelFormat *fmt)
 {
+	UNREFERENCED_PARAMETER(s);
+	
 	AVPixelFormat result = (AVPixelFormat)-1;
 	AVPixelFormat format;
 	int index = 0;

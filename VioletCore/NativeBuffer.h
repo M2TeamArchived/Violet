@@ -82,6 +82,7 @@ namespace NativeBuffer
 
 		STDMETHODIMP put_Length(UINT32 value)
 		{
+			UNREFERENCED_PARAMETER(value);
 			return E_FAIL;
 		}
 

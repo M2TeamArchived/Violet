@@ -155,6 +155,8 @@ UncompressedVideoSampleProvider::~UncompressedVideoSampleProvider()
 
 HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration)
 {
+	UNREFERENCED_PARAMETER(frameDuration);
+	
 	HRESULT hr = S_OK;
 
 	// Convert to output format using FFmpeg software scaler
@@ -208,7 +210,7 @@ HRESULT UncompressedVideoSampleProvider::SetSampleProperties(MediaStreamSample^ 
 	}
 	
 	bool NeedToSetMFMTVideoChromaSiting = false;
-	MFVideoChromaSubsampling MFMTVideoChromaSitingValue;
+	MFVideoChromaSubsampling MFMTVideoChromaSitingValue = MFVideoChromaSubsampling_Unknown;
 
 	switch (m_chroma_location)
 	{

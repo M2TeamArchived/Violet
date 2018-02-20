@@ -89,7 +89,7 @@ namespace FFmpegInterop
 		FFmpegInteropMSS(FFmpegInteropConfig^ config);
 
 		
-		HRESULT CreateMediaStreamSource(IRandomAccessStream^ stream, MediaStreamSource^ mss);
+		HRESULT CreateMediaStreamSource(IRandomAccessStream^ stream, MediaStreamSource^ MSS);
 		HRESULT CreateMediaStreamSource(String^ uri);
 		HRESULT InitFFmpegContext();
 		HRESULT CreateAudioStreamDescriptor();
