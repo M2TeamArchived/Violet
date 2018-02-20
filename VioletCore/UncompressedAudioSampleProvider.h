@@ -40,10 +40,9 @@ namespace FFmpegInterop
 			int streamIndex);
 		virtual HRESULT CreateBufferFromFrame(IBuffer^* pBuffer, AVFrame* avFrame, int64_t& framePts, int64_t& frameDuration) override;
 		IMediaStreamDescriptor^ CreateStreamDescriptor() override;
+		virtual HRESULT AllocateResources() override;
 	
 	private:
-		HRESULT InitializeResamplerIfRequired();
-
 		SwrContext* m_pSwrCtx;
 		AVSampleFormat inSampleFormat, outSampleFormat;
 		int inSampleRate, outSampleRate, inChannels, outChannels;

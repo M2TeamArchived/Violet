@@ -56,10 +56,18 @@ MediaSampleProvider::MediaSampleProvider(
 }
 
 HRESULT FFmpegInterop::MediaSampleProvider::Initialize()
-{
+{	
 	this->m_streamDescriptor = this->CreateStreamDescriptor();
+	if (nullptr == this->m_streamDescriptor)
+		return E_FAIL;
 
-	return this->m_streamDescriptor ? S_OK : E_FAIL;
+	return this->AllocateResources();
+}
+
+HRESULT FFmpegInterop::MediaSampleProvider::AllocateResources()
+{
+	DebugMessage(L"AllocateResources\n");
+	return S_OK;
 }
 
 MediaSampleProvider::~MediaSampleProvider()

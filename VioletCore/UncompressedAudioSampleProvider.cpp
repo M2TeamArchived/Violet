@@ -39,35 +39,33 @@ UncompressedAudioSampleProvider::UncompressedAudioSampleProvider(
 {
 }
 
-HRESULT UncompressedAudioSampleProvider::InitializeResamplerIfRequired()
+HRESULT FFmpegInterop::UncompressedAudioSampleProvider::AllocateResources()
 {
 	HRESULT hr = S_OK;
+	
+	// Set up resampler to convert to output format and channel layout.
+	m_pSwrCtx = swr_alloc_set_opts(
+		NULL,
+		outChannelLayout,
+		outSampleFormat,
+		outSampleRate,
+		inChannelLayout,
+		inSampleFormat,
+		inSampleRate,
+		0,
+		NULL);
+
 	if (!m_pSwrCtx)
 	{
-		// Set up resampler to convert to output format and channel layout.
-		m_pSwrCtx = swr_alloc_set_opts(
-			NULL,
-			outChannelLayout,
-			outSampleFormat,
-			outSampleRate,
-			inChannelLayout,
-			inSampleFormat,
-			inSampleRate,
-			0,
-			NULL);
+		hr = E_OUTOFMEMORY;
+	}
 
-		if (!m_pSwrCtx)
+	if (SUCCEEDED(hr))
+	{
+		if (swr_init(m_pSwrCtx) < 0)
 		{
-			hr = E_OUTOFMEMORY;
-		}
-
-		if (SUCCEEDED(hr))
-		{
-			if (swr_init(m_pSwrCtx) < 0)
-			{
-				hr = E_FAIL;
-				swr_free(&m_pSwrCtx);
-			}
+			hr = E_FAIL;
+			swr_free(&m_pSwrCtx);
 		}
 	}
 
@@ -87,24 +85,19 @@ HRESULT UncompressedAudioSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 {
 	HRESULT hr = S_OK;
 
-	hr = InitializeResamplerIfRequired();
+	// Resample uncompressed frame to output format
+	uint8_t **resampledData = nullptr;
+	unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, outChannels, avFrame->nb_samples, outSampleFormat, 0);
+	int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
 
-	if (SUCCEEDED(hr))
+	if (resampledDataSize < 0)
 	{
-		// Resample uncompressed frame to output format
-		uint8_t **resampledData = nullptr;
-		unsigned int aBufferSize = av_samples_alloc_array_and_samples(&resampledData, NULL, outChannels, avFrame->nb_samples, outSampleFormat, 0);
-		int resampledDataSize = swr_convert(m_pSwrCtx, resampledData, aBufferSize, (const uint8_t **)avFrame->extended_data, avFrame->nb_samples);
-
-		if (resampledDataSize < 0)
-		{
-			hr = E_FAIL;
-		}
-		else
-		{
-			auto size = min(aBufferSize, (unsigned int)(resampledDataSize * outChannels * av_get_bytes_per_sample(outSampleFormat)));
-			*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
-		}
+		hr = E_FAIL;
+	}
+	else
+	{
+		auto size = min(aBufferSize, (unsigned int)(resampledDataSize * outChannels * av_get_bytes_per_sample(outSampleFormat)));
+		*pBuffer = NativeBuffer::NativeBufferFactory::CreateNativeBuffer(resampledData[0], size, av_freep, resampledData);
 	}
 	
 	if (SUCCEEDED(hr))
@@ -164,4 +157,3 @@ IMediaStreamDescriptor ^ FFmpegInterop::UncompressedAudioSampleProvider::CreateS
 		return ref new AudioStreamDescriptor(AudioEncodingProperties::CreatePcm(outSampleRate, outChannels, 16));
 	}
 }
-

@@ -47,8 +47,14 @@ UncompressedVideoSampleProvider::UncompressedVideoSampleProvider(
 
 IMediaStreamDescriptor^ UncompressedVideoSampleProvider::CreateStreamDescriptor()
 {
-	SelectOutputFormat();
+	// We use NV12 format, NV12 is generally the preferred format.
+	m_OutputPixelFormat = AV_PIX_FMT_NV12;
+	OutputMediaSubtype = MediaEncodingSubtypes::Nv12;
 
+	DecoderWidth = m_pAvCodecCtx->width;
+	DecoderHeight = m_pAvCodecCtx->height;
+
+	// Create the StreamDescriptor.
 	VideoEncodingProperties^ videoProperties = 
 		VideoEncodingProperties::CreateUncompressed(
 			OutputMediaSubtype, DecoderWidth, DecoderHeight);
@@ -90,58 +96,46 @@ IMediaStreamDescriptor^ UncompressedVideoSampleProvider::CreateStreamDescriptor(
 	return ref new VideoStreamDescriptor(videoProperties);
 }
 
-void UncompressedVideoSampleProvider::SelectOutputFormat()
-{
-	// We use NV12 format, NV12 is generally the preferred format.
-	m_OutputPixelFormat = AV_PIX_FMT_NV12;
-	OutputMediaSubtype = MediaEncodingSubtypes::Nv12;
-
-	DecoderWidth = m_pAvCodecCtx->width;
-	DecoderHeight = m_pAvCodecCtx->height;
-}
-
-HRESULT UncompressedVideoSampleProvider::InitializeScalerIfRequired()
+HRESULT FFmpegInterop::UncompressedVideoSampleProvider::AllocateResources()
 {
 	HRESULT hr = S_OK;
-	if (!m_pSwsCtx)
+	
+	// Setup software scaler to convert frame to output pixel type
+	m_pSwsCtx = sws_getContext(
+		m_pAvCodecCtx->width,
+		m_pAvCodecCtx->height,
+		m_pAvCodecCtx->pix_fmt,
+		m_pAvCodecCtx->width,
+		m_pAvCodecCtx->height,
+		m_OutputPixelFormat,
+		SWS_BICUBIC,
+		NULL,
+		NULL,
+		NULL);
+
+	if (m_pSwsCtx == nullptr)
 	{
-		// Setup software scaler to convert frame to output pixel type
-		m_pSwsCtx = sws_getContext(
-			m_pAvCodecCtx->width,
-			m_pAvCodecCtx->height,
-			m_pAvCodecCtx->pix_fmt,
-			m_pAvCodecCtx->width,
-			m_pAvCodecCtx->height,
-			m_OutputPixelFormat,
-			SWS_BICUBIC,
-			NULL,
-			NULL,
-			NULL);
-
-		if (m_pSwsCtx == nullptr)
-		{
-			hr = E_OUTOFMEMORY;
-		}
-
-		// Allocate a frame for output.
-		if (av_image_alloc(
-			this->m_VideoBufferData,
-			this->m_VideoBufferLineSize,
-			DecoderWidth,
-			DecoderHeight,
-			m_OutputPixelFormat,
-			1) < 0)
-		{
-			hr = E_FAIL;
-		}
-
-		int YBufferSize = this->m_VideoBufferLineSize[0] * DecoderHeight;
-		int UBufferSize = this->m_VideoBufferLineSize[1] * DecoderHeight / 2;
-		int VBufferSize = this->m_VideoBufferLineSize[2] * DecoderHeight / 2;
-		int YUVBufferSize = YBufferSize + UBufferSize + VBufferSize;
-		
-		this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBufferData[0], YUVBufferSize);
+		hr = E_OUTOFMEMORY;
 	}
+
+	// Allocate a frame for output.
+	if (av_image_alloc(
+		this->m_VideoBufferData,
+		this->m_VideoBufferLineSize,
+		DecoderWidth,
+		DecoderHeight,
+		m_OutputPixelFormat,
+		1) < 0)
+	{
+		hr = E_FAIL;
+	}
+
+	int YBufferSize = this->m_VideoBufferLineSize[0] * DecoderHeight;
+	int UBufferSize = this->m_VideoBufferLineSize[1] * DecoderHeight / 2;
+	int VBufferSize = this->m_VideoBufferLineSize[2] * DecoderHeight / 2;
+	int YUVBufferSize = YBufferSize + UBufferSize + VBufferSize;
+
+	this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBufferData[0], YUVBufferSize);
 
 	return hr;
 }
@@ -163,27 +157,22 @@ HRESULT UncompressedVideoSampleProvider::CreateBufferFromFrame(IBuffer^* pBuffer
 {
 	HRESULT hr = S_OK;
 
-	hr = InitializeScalerIfRequired();
-
-	if (SUCCEEDED(hr))
+	// Convert to output format using FFmpeg software scaler
+	if (sws_scale(
+		m_pSwsCtx,
+		(const uint8_t **)(avFrame->data),
+		avFrame->linesize,
+		0,
+		m_pAvCodecCtx->height,
+		this->m_VideoBufferData,
+		this->m_VideoBufferLineSize) > 0)
 	{
-		// Convert to output format using FFmpeg software scaler
-		if (sws_scale(
-			m_pSwsCtx,
-			(const uint8_t **)(avFrame->data), 
-			avFrame->linesize,
-			0,
-			m_pAvCodecCtx->height,
-			this->m_VideoBufferData,
-			this->m_VideoBufferLineSize) > 0)
-		{
-			*pBuffer = this->m_VideoBufferObject;
-		}
-		else
-		{
-			av_freep(this->m_VideoBufferData);
-			hr = E_FAIL;
-		}
+		*pBuffer = this->m_VideoBufferObject;
+	}
+	else
+	{
+		av_freep(this->m_VideoBufferData);
+		hr = E_FAIL;
 	}
 
 	// Don't set a timestamp on S_FALSE
