@@ -33,7 +33,6 @@
     <ClCompile Include="NativeBufferFactory.cpp">
       <Filter>FFmpegInterop</Filter>
     </ClCompile>
-    <ClCompile Include="M2.Helpers.WinRT.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="pch.h" />
@@ -68,6 +67,5 @@
     <ClInclude Include="NativeBufferFactory.h">
       <Filter>FFmpegInterop</Filter>
     </ClInclude>
-    <ClInclude Include="M2.Helpers.WinRT.h" />
   </ItemGroup>
 </Project>
