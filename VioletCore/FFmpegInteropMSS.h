@@ -33,6 +33,8 @@ extern "C"
 #include <libavformat/avformat.h>
 }
 
+#include "CritSec.h"
+
 namespace FFmpegInterop
 {
 	/*public*/ ref class FFmpegInteropMSS sealed
@@ -88,6 +90,7 @@ namespace FFmpegInterop
 	private:
 		FFmpegInteropMSS(FFmpegInteropConfig^ config);
 
+		DWORD m_NumberOfHardwareThreads = 0;
 		
 		HRESULT CreateMediaStreamSource(IRandomAccessStream^ stream, MediaStreamSource^ MSS);
 		HRESULT CreateMediaStreamSource(String^ uri);
@@ -104,21 +107,21 @@ namespace FFmpegInterop
 		EventRegistrationToken startingRequestedToken;
 		EventRegistrationToken sampleRequestedToken;
 
-		internal:
+	internal:
 		AVDictionary* avDict;
 		AVIOContext* avIOCtx;
 		AVFormatContext* avFormatCtx;
 		AVCodecContext* avAudioCodecCtx;
 		AVCodecContext* avVideoCodecCtx;
 
-		private:
+	private:
 		FFmpegInteropConfig ^ config;
 		AudioStreamDescriptor^ audioStreamDescriptor;
 		VideoStreamDescriptor^ videoStreamDescriptor;
 		int audioStreamIndex;
 		int videoStreamIndex;
 		
-		std::recursive_mutex mutexGuard;
+		CritSec csGuard;
 		
 		MediaSampleProvider^ audioSampleProvider;
 		MediaSampleProvider^ videoSampleProvider;

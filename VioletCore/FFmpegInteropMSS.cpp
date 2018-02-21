@@ -49,11 +49,14 @@ FFmpegInteropMSS::FFmpegInteropMSS(FFmpegInteropConfig^ interopConfig)
 		av_lockmgr_register(lock_manager);
 		isRegistered = true;
 	}
+
+	this->m_NumberOfHardwareThreads = M2GetNumberOfHardwareThreads();
 }
 
 FFmpegInteropMSS::~FFmpegInteropMSS()
 {
-	mutexGuard.lock();
+	this->csGuard.Lock();
+
 	if (mss)
 	{
 		mss->Starting -= startingRequestedToken;
@@ -82,7 +85,8 @@ FFmpegInteropMSS::~FFmpegInteropMSS()
 	{
 		fileStreamData->Release();
 	}
-	mutexGuard.unlock();
+
+	this->csGuard.Unlock();
 }
 
 FFmpegInteropMSS^ FFmpegInteropMSS::CreateFromStream(IRandomAccessStream^ stream, FFmpegInteropConfig^ config, MediaStreamSource^ mss)
@@ -296,7 +300,7 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 		}
 	}
 
-	if (SUCCEEDED(hr) && !config->IsFrameGrabber)
+	if (SUCCEEDED(hr))
 	{
 		// Find the audio stream and its decoder
 		AVCodec* avAudioCodec = nullptr;
@@ -338,7 +342,7 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 					}
 
 					// enable multi threading
-					unsigned threads = std::thread::hardware_concurrency();
+					DWORD& threads = this->m_NumberOfHardwareThreads;
 					if (threads > 0)
 					{
 						avAudioCodecCtx->thread_count = config->MaxAudioThreads == 0 ? threads : min(threads, config->MaxAudioThreads);
@@ -414,11 +418,11 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 				if (SUCCEEDED(hr))
 				{
 					// enable multi threading
-					unsigned threads = std::thread::hardware_concurrency();
+					DWORD& threads = this->m_NumberOfHardwareThreads;
 					if (threads > 0)
 					{
 						avVideoCodecCtx->thread_count = config->MaxVideoThreads == 0 ? threads : min(threads, config->MaxVideoThreads);
-						avVideoCodecCtx->thread_type = config->IsFrameGrabber ? FF_THREAD_SLICE : FF_THREAD_FRAME | FF_THREAD_SLICE;
+						avVideoCodecCtx->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
 					}
 
 					if (avcodec_open2(avVideoCodecCtx, avVideoCodec, NULL) < 0)
@@ -614,7 +618,8 @@ void FFmpegInteropMSS::OnStarting(MediaStreamSource ^sender, MediaStreamSourceSt
 
 void FFmpegInteropMSS::OnSampleRequested(Windows::Media::Core::MediaStreamSource ^sender, MediaStreamSourceSampleRequestedEventArgs ^args)
 {
-	mutexGuard.lock();
+	this->csGuard.Lock();
+
 	if (mss != nullptr)
 	{
 		if (args->Request->StreamDescriptor == audioStreamDescriptor && audioSampleProvider != nullptr)
@@ -630,7 +635,8 @@ void FFmpegInteropMSS::OnSampleRequested(Windows::Media::Core::MediaStreamSource
 			args->Request->Sample = nullptr;
 		}
 	}
-	mutexGuard.unlock();
+
+	this->csGuard.Unlock();
 }
 
 HRESULT FFmpegInteropMSS::Seek(TimeSpan position)

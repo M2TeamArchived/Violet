@@ -9,7 +9,7 @@
 
 class CritSec
 {
-public:
+private:
 	CRITICAL_SECTION m_criticalSection;
 public:
 	CritSec()

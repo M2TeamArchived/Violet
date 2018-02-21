@@ -24,8 +24,5 @@ namespace FFmpegInterop
 		property unsigned int StreamBufferSize;
 
 		property PropertySet^ FFmpegOptions;
-
-	internal:
-		property bool IsFrameGrabber;
 	};
 }
