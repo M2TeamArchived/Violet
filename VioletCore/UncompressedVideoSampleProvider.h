@@ -60,6 +60,8 @@ namespace FFmpegInterop
 
 		int m_VideoBufferLineSize[4];
 		uint8_t* m_VideoBufferData[4];
+
+		uint8_t* m_VideoBuffer = nullptr;
 	};
 }
 

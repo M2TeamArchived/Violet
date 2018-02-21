@@ -119,37 +119,49 @@ HRESULT FFmpegInterop::UncompressedVideoSampleProvider::AllocateResources()
 	}
 
 	// Allocate a frame for output.
-	if (av_image_alloc(
-		this->m_VideoBufferData,
-		this->m_VideoBufferLineSize,
-		DecoderWidth,
-		DecoderHeight,
-		m_OutputPixelFormat,
-		1) < 0)
 	{
-		hr = E_FAIL;
+		if (av_image_fill_linesizes(
+			this->m_VideoBufferLineSize, 
+			this->m_OutputPixelFormat,
+			DecoderWidth) < 0)
+		{
+			hr = E_FAIL;
+		}
+		else
+		{
+			int YBufferSize = this->m_VideoBufferLineSize[0] * DecoderHeight;
+			int UBufferSize = this->m_VideoBufferLineSize[1] * DecoderHeight / 2;
+			int VBufferSize = this->m_VideoBufferLineSize[2] * DecoderHeight / 2;
+			int YUVBufferSize = YBufferSize + UBufferSize + VBufferSize;
+
+			this->m_VideoBuffer = reinterpret_cast<uint8_t*>(malloc(YUVBufferSize));
+			if (nullptr == this->m_VideoBuffer)
+			{
+				hr = E_OUTOFMEMORY;
+			}
+
+			this->m_VideoBufferData[0] = this->m_VideoBuffer;
+			this->m_VideoBufferData[1] = UBufferSize > 0 ? this->m_VideoBufferData[0] + YBufferSize : nullptr;
+			this->m_VideoBufferData[2] = VBufferSize > 0 ? this->m_VideoBufferData[1] + UBufferSize : nullptr;
+			this->m_VideoBufferData[3] = nullptr;
+
+			this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBuffer, YUVBufferSize);
+		}
 	}
-
-	int YBufferSize = this->m_VideoBufferLineSize[0] * DecoderHeight;
-	int UBufferSize = this->m_VideoBufferLineSize[1] * DecoderHeight / 2;
-	int VBufferSize = this->m_VideoBufferLineSize[2] * DecoderHeight / 2;
-	int YUVBufferSize = YBufferSize + UBufferSize + VBufferSize;
-
-	this->m_VideoBufferObject = M2MakeIBuffer(this->m_VideoBufferData[0], YUVBufferSize);
 
 	return hr;
 }
 
 UncompressedVideoSampleProvider::~UncompressedVideoSampleProvider()
 {
-	if (m_pSwsCtx)
+	if (nullptr != this->m_pSwsCtx)
 	{
-		sws_freeContext(m_pSwsCtx);
+		sws_freeContext(this->m_pSwsCtx);
 	}
 
-	if (nullptr != this->m_VideoBufferData)
+	if (nullptr != this->m_VideoBuffer)
 	{
-		av_freep(this->m_VideoBufferData);
+		free(this->m_VideoBuffer);
 	}
 }
 
