@@ -45,6 +45,20 @@ namespace FFmpegInterop
 			IMediaStreamDescriptor^ get() { return this->m_streamDescriptor; }
 		}
 
+		property int StreamIndex
+		{
+			int get() { return m_streamIndex; }
+		}
+
+		property bool IsEnabled
+		{
+			bool get() { return m_isEnabled; }
+		}
+
+		property Platform::String^ Name;
+		property Platform::String^ Language;
+		property Platform::String^ CodecName;
+
 	internal:
 		virtual HRESULT Initialize();
 		virtual HRESULT AllocateResources();
@@ -54,6 +68,7 @@ namespace FFmpegInterop
 		virtual HRESULT CreateNextSampleBuffer(IBuffer^* pBuffer, int64_t& samplePts, int64_t& sampleDuration) = 0;
 		virtual IMediaStreamDescriptor^ CreateStreamDescriptor() = 0;
 		virtual HRESULT SetSampleProperties(MediaStreamSample^ sample) { return S_OK; }; // can be overridded for setting extended properties
+		void EnableStream();
 		void DisableStream();
 		virtual void SetCommonVideoEncodingProperties(VideoEncodingProperties^ videoEncodingProperties);
 
@@ -79,13 +94,15 @@ namespace FFmpegInterop
 		AVFormatContext* m_pAvFormatCtx;
 		AVCodecContext* m_pAvCodecCtx;
 		AVStream* m_pAvStream;
-		bool m_isEnabled;
+		bool m_isEnabled = false;
 		bool m_isDiscontinuous;
 		int m_streamIndex;
 		int64 m_startOffset;
 
 	};
 }
+
+Platform::String^ ConvertString(const char* charString);
 
 // free AVBufferRef*
 void free_buffer(void *lpVoid);

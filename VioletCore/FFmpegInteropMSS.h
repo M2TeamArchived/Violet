@@ -19,9 +19,10 @@
 #pragma once
 #include <queue>
 #include <mutex>
+#include <pplawait.h>
 #include "FFmpegReader.h"
 #include "MediaSampleProvider.h"
-#include <pplawait.h>
+#include "StreamInfo.h"
 
 using namespace Platform;
 using namespace Windows::Foundation;
@@ -48,18 +49,18 @@ namespace FFmpegInterop
 		virtual ~FFmpegInteropMSS();
 
 		// Properties
-		property AudioStreamDescriptor^ AudioDescriptor
+		property String^ VideoCodecName
 		{
-			AudioStreamDescriptor^ get()
+			String^ get()
 			{
-				return audioStreamDescriptor;
+				return videoStream ? videoStream->CodecName : nullptr;
 			};
 		};
-		property VideoStreamDescriptor^ VideoDescriptor
+		property String^ AudioCodecName
 		{
-			VideoStreamDescriptor^ get()
+			String^ get()
 			{
-				return videoStreamDescriptor;
+				return audioStreamInfos->Size > 0 ? audioStreamInfos->GetAt(0)->CodecName : nullptr;
 			};
 		};
 		property TimeSpan Duration
@@ -69,20 +70,21 @@ namespace FFmpegInterop
 				return mediaDuration;
 			};
 		};
-		property String^ VideoCodecName
+
+		property VideoStreamInfo^ VideoStream
 		{
-			String^ get()
-			{
-				return videoCodecName;
-			};
-		};
-		property String^ AudioCodecName
+			VideoStreamInfo^ get() { return videoStreamInfo; }
+		}
+
+		property IVectorView<AudioStreamInfo^>^ AudioStreams
 		{
-			String^ get()
-			{
-				return audioCodecName;
-			};
-		};
+			IVectorView<AudioStreamInfo^>^ get() { return audioStreamInfos; }
+		}
+
+		property IVectorView<SubtitleStreamInfo^>^ SubtitleStreams
+		{
+			IVectorView<SubtitleStreamInfo^>^ get() { return subtitleStreamInfos; }
+		}
 
 	internal:
 		int ReadPacket();
@@ -95,36 +97,38 @@ namespace FFmpegInterop
 		HRESULT CreateMediaStreamSource(IRandomAccessStream^ stream, MediaStreamSource^ MSS);
 		HRESULT CreateMediaStreamSource(String^ uri);
 		HRESULT InitFFmpegContext();
-		HRESULT CreateAudioStreamDescriptor();
-		HRESULT CreateVideoStreamDescriptor();
-		HRESULT ConvertCodecName(const char* codecName, String^ *outputCodecName);
+		MediaSampleProvider^ CreateAudioStream(AVStream * avStream, int index);
+		MediaSampleProvider^ CreateVideoStream(AVStream * avStream, int index);
+		MediaSampleProvider^ CreateAudioSampleProvider(AVStream * avStream, AVCodecContext* avCodecCtx, int index);
+		MediaSampleProvider^ CreateVideoSampleProvider(AVStream * avStream, AVCodecContext* avCodecCtx, int index);
 		HRESULT ParseOptions(PropertySet^ ffmpegOptions);
 		void OnStarting(MediaStreamSource ^sender, MediaStreamSourceStartingEventArgs ^args);
 		void OnSampleRequested(MediaStreamSource ^sender, MediaStreamSourceSampleRequestedEventArgs ^args);
+		void OnSwitchStreamsRequested(MediaStreamSource^ sender, MediaStreamSourceSwitchStreamsRequestedEventArgs^ args);
 		HRESULT Seek(TimeSpan position);
 
 		MediaStreamSource^ mss;
 		EventRegistrationToken startingRequestedToken;
 		EventRegistrationToken sampleRequestedToken;
+		EventRegistrationToken switchStreamRequestedToken;
 
 	internal:
 		AVDictionary* avDict;
 		AVIOContext* avIOCtx;
 		AVFormatContext* avFormatCtx;
-		AVCodecContext* avAudioCodecCtx;
-		AVCodecContext* avVideoCodecCtx;
 
 	private:
 		FFmpegInteropConfig ^ config;
-		AudioStreamDescriptor^ audioStreamDescriptor;
-		VideoStreamDescriptor^ videoStreamDescriptor;
-		int audioStreamIndex;
-		int videoStreamIndex;
+		std::vector<MediaSampleProvider^> sampleProviders;
+		std::vector<MediaSampleProvider^> audioStreams;
+		MediaSampleProvider^ videoStream;
+		MediaSampleProvider^ currentAudioStream;
 		
+		VideoStreamInfo^ videoStreamInfo;
+		IVectorView<AudioStreamInfo^>^ audioStreamInfos;
+		IVectorView<SubtitleStreamInfo^>^ subtitleStreamInfos;
+
 		CritSec csGuard;
-		
-		MediaSampleProvider^ audioSampleProvider;
-		MediaSampleProvider^ videoSampleProvider;
 
 		String^ videoCodecName;
 		String^ audioCodecName;

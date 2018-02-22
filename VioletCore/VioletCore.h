@@ -79,20 +79,6 @@ namespace VioletCore
 		MediaStreamSource^ GetMediaStreamSource();
 
 		// Properties
-		property AudioStreamDescriptor^ AudioDescriptor
-		{
-			AudioStreamDescriptor^ get()
-			{
-				return this->m_interop->AudioDescriptor;
-			};
-		};
-		property VideoStreamDescriptor^ VideoDescriptor
-		{
-			VideoStreamDescriptor^ get()
-			{
-				return this->m_interop->VideoDescriptor;
-			};
-		};
 		property TimeSpan Duration
 		{
 			TimeSpan get()

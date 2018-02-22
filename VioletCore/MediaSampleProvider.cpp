@@ -33,7 +33,6 @@ MediaSampleProvider::MediaSampleProvider(
 	, m_pAvFormatCtx(avFormatCtx)
 	, m_pAvCodecCtx(avCodecCtx)
 	, m_pAvStream(m_pAvFormatCtx->streams[m_streamIndex])
-	, m_isEnabled(true)
 	, m_config(config)
 	, m_streamIndex(streamIndex)
 {
@@ -61,6 +60,28 @@ HRESULT FFmpegInterop::MediaSampleProvider::Initialize()
 	if (nullptr == this->m_streamDescriptor)
 		return E_FAIL;
 
+	if (m_streamDescriptor)
+	{
+		// unfortunately, setting Name or Language on MediaStreamDescriptor does not have any effect, they are not shown in track selection list
+		auto title = av_dict_get(m_pAvStream->metadata, "title", NULL, 0);
+		if (title)
+		{
+			Name = ConvertString(title->value);
+		}
+
+		auto language = av_dict_get(m_pAvStream->metadata, "language", NULL, 0);
+		if (language)
+		{
+			Language = ConvertString(language->value);
+		}
+
+		auto codec = m_pAvCodecCtx->codec_descriptor->name;
+		if (codec)
+		{
+			CodecName = ConvertString(codec);
+		}
+	}
+
 	return this->AllocateResources();
 }
 
@@ -73,6 +94,9 @@ HRESULT FFmpegInterop::MediaSampleProvider::AllocateResources()
 MediaSampleProvider::~MediaSampleProvider()
 {
 	DebugMessage(L"~MediaSampleProvider\n");
+
+	avcodec_close(m_pAvCodecCtx);
+	avcodec_free_context(&m_pAvCodecCtx);
 }
 
 MediaStreamSample^ MediaSampleProvider::GetNextSample()
@@ -197,7 +221,13 @@ void MediaSampleProvider::Flush()
 		AVPacket *avPacket = PopPacket();
 		av_packet_free(&avPacket);
 	}
+	avcodec_flush_buffers(m_pAvCodecCtx);
 	m_isDiscontinuous = true;
+}
+
+void MediaSampleProvider::EnableStream()
+{
+	DebugMessage(L"EnableStream\n");
 	m_isEnabled = true;
 }
 
@@ -231,6 +261,11 @@ void MediaSampleProvider::SetCommonVideoEncodingProperties(VideoEncodingProperti
 	}
 
 	videoEncodingProperties->Bitrate = static_cast<unsigned int>(m_pAvCodecCtx->bit_rate);
+}
+
+Platform::String^ ConvertString(const char* charString)
+{
+	return M2MakeCXString(M2MakeUTF16String(std::string(charString)));
 }
 
 void free_buffer(void *lpVoid)
