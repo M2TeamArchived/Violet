@@ -49,20 +49,7 @@ namespace FFmpegInterop
 		virtual ~FFmpegInteropMSS();
 
 		// Properties
-		property String^ VideoCodecName
-		{
-			String^ get()
-			{
-				return videoStream ? videoStream->CodecName : nullptr;
-			};
-		};
-		property String^ AudioCodecName
-		{
-			String^ get()
-			{
-				return audioStreamInfos->Size > 0 ? audioStreamInfos->GetAt(0)->CodecName : nullptr;
-			};
-		};
+
 		property TimeSpan Duration
 		{
 			TimeSpan get()

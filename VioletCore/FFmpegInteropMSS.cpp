@@ -248,36 +248,6 @@ HRESULT FFmpegInteropMSS::CreateMediaStreamSource(IRandomAccessStream^ stream, M
 	return hr;
 }
 
-static int is_hwaccel_pix_fmt(enum AVPixelFormat pix_fmt)
-{
-	const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
-	return desc->flags & AV_PIX_FMT_FLAG_HWACCEL;
-}
-
-static AVPixelFormat get_format(struct AVCodecContext *s, const enum AVPixelFormat *fmt)
-{
-	UNREFERENCED_PARAMETER(s);
-	
-	AVPixelFormat result = (AVPixelFormat)-1;
-	AVPixelFormat format;
-	int index = 0;
-	do
-	{
-		format = fmt[index++];
-		if (format != -1 && result == -1 && !is_hwaccel_pix_fmt(format))
-		{
-			// take first non hw accelerated format
-			result = format;
-		}
-		else if (format == AV_PIX_FMT_NV12 && result != AV_PIX_FMT_YUVA420P)
-		{
-			// switch to NV12 if available, unless this is an alpha channel file
-			result = format;
-		}
-	} while (format != -1);
-	return result;
-}
-
 HRESULT FFmpegInteropMSS::InitFFmpegContext()
 {
 	HRESULT hr = S_OK;
@@ -303,11 +273,11 @@ HRESULT FFmpegInteropMSS::InitFFmpegContext()
 	auto subtitleStrInfos = ref new Vector<SubtitleStreamInfo^>();
 
 	AVCodec* avVideoCodec;
-	auto videoStreamIndex = av_find_best_stream(avFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &avVideoCodec, 0);
-	auto audioStreamIndex = av_find_best_stream(avFormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
-	auto subtitleStreamIndex = av_find_best_stream(avFormatCtx, AVMEDIA_TYPE_SUBTITLE, -1, -1, NULL, 0);
+	unsigned int videoStreamIndex = av_find_best_stream(avFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &avVideoCodec, 0);
+	unsigned int audioStreamIndex = av_find_best_stream(avFormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+	unsigned int subtitleStreamIndex = av_find_best_stream(avFormatCtx, AVMEDIA_TYPE_SUBTITLE, -1, -1, NULL, 0);
 
-	for (int index = 0; index < static_cast<int>(avFormatCtx->nb_streams); ++index)
+	for (unsigned int index = 0; index < avFormatCtx->nb_streams; ++index)
 	{
 		auto avStream = avFormatCtx->streams[index];
 		MediaSampleProvider^ stream;
@@ -522,8 +492,6 @@ MediaSampleProvider^ FFmpegInteropMSS::CreateVideoStream(AVStream * avStream, in
 
 		if (SUCCEEDED(hr))
 		{
-			avVideoCodecCtx->get_format = &get_format;
-
 			// initialize the stream parameters with demuxer information
 			if (avcodec_parameters_to_context(avVideoCodecCtx, avStream->codecpar) < 0)
 			{
@@ -672,16 +640,17 @@ void FFmpegInteropMSS::OnSampleRequested(Windows::Media::Core::MediaStreamSource
 void FFmpegInteropMSS::OnSwitchStreamsRequested(MediaStreamSource ^ sender, MediaStreamSourceSwitchStreamsRequestedEventArgs ^ args)
 {
 	this->csGuard.Lock();
-	if (currentAudioStream && args->Request->OldStreamDescriptor && currentAudioStream->StreamDescriptor)
+	if (currentAudioStream && args->Request->OldStreamDescriptor == currentAudioStream->StreamDescriptor)
 	{
-		for each (auto stream in audioStreams)
+		currentAudioStream->DisableStream();
+		currentAudioStream = nullptr;
+	}
+	for each (auto stream in audioStreams)
+	{
+		if (stream->StreamDescriptor == args->Request->NewStreamDescriptor)
 		{
-			if (stream->StreamDescriptor == args->Request->NewStreamDescriptor)
-			{
-				currentAudioStream->DisableStream();
-				currentAudioStream = stream;
-				currentAudioStream->EnableStream();
-			}
+			currentAudioStream = stream;
+			currentAudioStream->EnableStream();
 		}
 	}
 	this->csGuard.Unlock();

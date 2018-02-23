@@ -86,20 +86,6 @@ namespace VioletCore
 				return this->m_interop->Duration;
 			};
 		};
-		property String^ VideoCodecName
-		{
-			String^ get()
-			{
-				return this->m_interop->VideoCodecName;
-			};
-		};
-		property String^ AudioCodecName
-		{
-			String^ get()
-			{
-				return this->m_interop->AudioCodecName;
-			};
-		};
 	};
 
 }
