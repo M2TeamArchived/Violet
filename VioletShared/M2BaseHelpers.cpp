@@ -5,7 +5,7 @@ File Name: M2BaseHelpers.cpp
 License: The MIT License
 ******************************************************************************/
 
-#include "pch.h"
+#include "stdafx.h"
 
 #include <Windows.h>
 
@@ -29,27 +29,28 @@ std::wstring M2FormatString(
 		va_list ArgList = nullptr;
 		va_start(ArgList, Format);
 
-		// Get the length of rhe format result.
+		// Get the length of the format result.
 		size_t nLength = _vscwprintf(Format, ArgList) + 1;
 
 		// Allocate for the format result.
 		std::wstring Buffer(nLength + 1, L'\0');
 
-		// Format the string
+		// Format the string.
 		int nWritten = _vsnwprintf_s(
 			&Buffer[0],
 			Buffer.size(),
 			nLength,
 			Format,
 			ArgList);
+
+		va_end(ArgList);
+
 		if (nWritten > 0)
 		{
 			// If succeed, resize to fit and return result.
 			Buffer.resize(nWritten);
 			return Buffer;
-		}
-
-		va_end(ArgList);
+		}		
 	}
 
 	// If failed, return "N/A".
@@ -141,4 +142,17 @@ std::string M2MakeUTF8String(const std::wstring& UTF16String)
 	}
 
 	return UTF8String;
+}
+
+// Retrieves the calling thread's last-error code value. The last-error code is
+// maintained on a per-thread basis. Multiple threads do not overwrite each 
+// other's last-error code.
+// Parameters:
+//   The function does not have parameters.
+// Return value:
+//   The return value is the calling thread's last-error code which is 
+//   converted to an HRESULT value.
+HRESULT M2GetLastError()
+{
+	return __HRESULT_FROM_WIN32(GetLastError());
 }
